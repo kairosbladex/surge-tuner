@@ -1,0 +1,164 @@
+# 应用内广告（In-App Ad）域名列表
+# 包含 Banner、插屏、信息流、奖励视频等广告
+# 格式：DOMAIN-SUFFIX 或 DOMAIN-KEYWORD
+
+# === 穿山甲（信息流/视频广告）===
+*.pangle.com
+*.pangle.io
+*.pangolin-sdk-toutiao.com
+*.pangolin.snssdk.com
+*.bsd-pglstatp.byteoversea.com
+*.pgdt.bytedance.com
+*.ads-download.pangle.io
+*.ads-ad.pangle.io
+*.lf1.byteoversea.com
+*.lf3.byteoversea.com
+*.lf6.byteoversea.com
+*.lf9.byteoversea.com
+*.lf16.byteoversea.com
+*.sdkapi.byteoversea.com
+*.api.pangle.io
+*.adx.pangle.io
+*.pangle-adsapi.com
+*.pangle-adapter.com
+*.feedback.pangle.io
+
+# === 腾讯广告（信息流/视频）===
+*.gdt.qq.com
+*.e.qq.com
+*.ia.gdt.qq.com
+*.btrace.qq.com
+*.btrace.gdt.qq.com
+*.btrace.qq.com
+*.adfilter.qq.com
+*.rpt.gdt.qq.com
+*.adservicer.qq.com
+*.ads.qq.com
+*.adpush.qq.com
+*.adcdn.qq.com
+*.adm.qq.com
+*.adsplash.qq.com
+*.adsfile.qq.com
+*.adsapi.qq.com
+*.minigame.qq.com
+*.ad.qq.com
+*.wzry.qq.com
+
+# === 百度广告 ===
+*.e.baidu.com
+*.nsclick.baidu.com
+*.cpro.baidu.com
+*.mssp.baidu.com
+*.cb.baidu.com
+*.adm.baidu.com
+*.mobads.baidu.com
+*.union.baidu.com
+*.sdkapp.clip.baidu.com
+*.wk.baidu.com
+*.ad.rd.baidu.com
+
+# === 快手广告 ===
+*.ad.kuaishou.com
+*.ads.kuaishou.com
+*.ad.kuaishou.cn
+*.track.kuaishou.com
+*.ad-gateway.kuaishou.com
+*.e.kuaishou.com
+*.adproxy.kuaishou.com
+
+# === 华为广告 ===
+*.ad.huawei.com
+*.ads.huawei.com
+*.adx.huawei.com
+*.adserver.huawei.com
+*.ads-d.huawei.com
+*.adapi.huawei.com
+*.adplatform.huawei.com
+*.huawei-ad.com
+
+# === 小米广告 ===
+*.ad.xiaomi.com
+*.ads.xiaomi.com
+*.adapi.xiaomi.com
+*.adserver.xiaomi.com
+*.adx.xiaomi.com
+*.mistat.xiaomi.com
+*.sdk.ad.xiaomi.com
+
+# === VIVO 广告 ===
+*.ad.vivo.com
+*.ads.vivo.com
+*.adx.vivo.com
+*.adserver.vivo.com
+*.sdk.ad.vivo.com
+
+# === OPPO 广告 ===
+*.ad.oppo.com
+*.ads.oppo.com
+*.adx.oppo.com
+*.adserver.oppo.com
+
+# === 广告联盟 ===
+*.mintegral.com
+*.mintegral.net
+*.m.mintegral.com
+*.ad.mintegral.com
+*.track.mintegral.com
+*.sg.mintegral.com
+*.adxmi.com
+*.adxmi.net
+*.mobvs.com
+*.adplay.com
+*.adx.com
+*.ssp.com
+*.sspnet.com
+*.adsrvmedia.com
+*.adform.com
+*.smartadserver.com
+*.criteo.com
+*.criteo.net
+*.casalemedia.com
+*.openx.net
+*.pubmatic.com
+*.rubiconproject.com
+*.sovrn.com
+*.indexww.com
+*.adnxs.com
+*.adsafeprotected.com
+*.moatads.com
+*.moat.com
+*.scorecardresearch.com
+*.comscore.com
+
+# === Apple 广告 ===
+*.ads.apple.com
+*.advertising.apple.com
+*.iads.apple.com
+*.searchads.apple.com
+
+# === Amazon 广告 ===
+*.amazon-adsystem.com
+*.a2z.com
+*.amazonadsi.com
+*.amazon.com
+
+# === TikTok 广告 ===
+*.ads.tiktok.com
+*.ads-sg.tiktok.com
+*.ads-gg.tiktok.com
+*.ads.tiktokforbusiness.com
+*.business-api.tiktok.com
+
+# === 其他 ===
+*.adzerk.net
+*.adsrvr.org
+*.adnxs.com
+*.adsymptotic.com
+*.demdex.net
+*.krxd.net
+*.exelator.com
+*.bluekai.com
+*.rlcdn.com
+*.addthis.com
+*.outbrain.com
+*.taboola.com

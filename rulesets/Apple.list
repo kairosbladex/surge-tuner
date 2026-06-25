@@ -1,0 +1,27 @@
+# Apple 服务白名单
+# Surge 规则集格式：每行一个域名
+# 用于跳过 MITM 解密，确保 iCloud/iMessage/App Store 稳定
+
+*.apple.com
+*.icloud.com
+*.icloud-content.com
+*.icloud-assets.com
+*.mzstatic.com
+*.itunes.apple.com
+*.apps.apple.com
+*.appstore.com
+*.push.apple.com
+*.guzzoni.apple.com
+*.apple-cloudkit.com
+*.crashlytics.com
+*.digicert.com
+*.apple-dns.net
+*.aaplimg.com
+*.appleswift.com
+*.apple.com.cn
+*.icloud.com.cn
+*.cdn-apple.com
+*.apple-mapkit.com
+*.apple-icloud.com
+*.apple-livephotoskit.com
+*.apple-news.com

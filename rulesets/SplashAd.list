@@ -1,0 +1,154 @@
+# 开屏广告（Splash Ad）域名列表
+# 国内 App 开屏广告主要来自以下 SDK 域名
+# 格式：DOMAIN-SUFFIX 或 DOMAIN-KEYWORD
+
+# === 穿山甲 / Pangle（字节跳动广告，出现率最高）===
+ads-ad.pangle.io
+*.pangle.io
+*.pangleglobal.com
+*.pangolin-sdk-toutiao.com
+*.pangolin.snssdk.com
+*.byteoversea.com
+*.byteoversea.net
+*.pglstatp.com
+*.pgdt.bytedance.com
+*.ads-download.bytedance.com
+*.ad.oceanengine.com
+*.ad.toutiao.com
+*.ad.oceanengine.com
+*.ads.pangolin.com
+*.pangle.voiceads.cn
+
+# === 广点通 / GDT（腾讯广告）===
+*.gdt.qq.com
+*.e.qq.com
+*.ia.gdt.qq.com
+*.btrace.gdt.qq.com
+*.ads.gdt.qq.com
+*.ad.qq.com
+*.adkey.qq.com
+*.adfilter.qq.com
+*.adsrv.qq.com
+*.btrace.qq.com
+*.qzs.qq.com
+*.static.gdt.qq.com
+*.gdtad.qq.com
+*.in.qq.com
+
+# === 友盟 / Umeng ===
+*.umeng.com
+*.umtrack.com
+*.umengcloud.com
+*.umsns.com
+*.up.umeng.com
+*.msg.umeng.com
+*.al.umeng.com
+*.error.umeng.com
+*.ulogs.umeng.com
+
+# === 百度广告 ===
+*.cpro.baidu.com
+*.cpro.static.baidu.com
+*.dup.baidustatic.com
+*.e.baidu.com
+*.nsclick.baidu.com
+*.baidustatic.com
+*.cb.baidu.com
+*.wk.baidu.com
+*.mssp.baidu.com
+*.union.baidu.com
+*.sdkapp.clip.baidu.com
+*.ad.rd.baidu.com
+*.adm.baidu.com
+*.baiducontent.com
+*.mobads.baidu.com
+*.admob.baidu.com
+
+# === 科大讯飞（如果系、AI 广告）===
+*.voiceads.cn
+*.voiceads.voicecloud.cn
+*.open.voicecloud.cn
+*.ad.xiaomi.com
+
+# === 广告联盟通用 ===
+*.adsmogo.com
+*.adsmogo.net
+*.adwo.com
+*.adwoimg.com
+*.domob.com
+*.domob.net
+*.domob.cn
+*.immob.cn
+*.immob.com
+*.mobgi.com
+*.mobgi.net
+*.youmi.net
+*.mmstat.com
+*.admaster.com.cn
+*.admaster.cn
+*.tanx.com
+*.tanx.cn
+*.alimama.com
+*.alimama.cn
+*.mmstat.com
+*.sinaad.com
+*.adsame.com
+*.adsafeprotected.com
+
+# === 热云数据（广告追踪）===
+*.reyun.com
+*.reyun.net
+*.talkingdata.com
+*.talkingdata.net
+
+# === AppsFlyer（广告归因）===
+*.appsflyer.com
+*.appsflyer.net
+*.appsflyer-sdk.com
+*.attribution.appsflyer.com
+
+# === Adjust ===
+*.adjust.com
+*.adjust.net
+*.adjust.io
+*.app.adjust.com
+
+# === Firebase / Google 广告 ===
+*.firebaseio.com
+*.googlesyndication.com
+*.doubleclick.net
+*.googleadservices.com
+*.googletagservices.com
+*.googletagmanager.com
+*.google-analytics.com
+*.adservice.google.com
+*.pagead2.googlesyndication.com
+*.adgallery.google.com
+*.admob.com
+
+# === Facebook Ads ===
+*.facebook.com
+*.facebook.net
+*.fbcdn.net
+*.fb.com
+*.fbsbx.com
+*.an.facebook.com
+*.graph.facebook.com
+*.connect.facebook.net
+
+# === 其他 ===
+*.mobfox.com
+*.inmobi.com
+*.vungle.com
+*.applovin.com
+*.unityads.unity3d.com
+*.adcolony.com
+*.chartboost.com
+*.tapjoy.com
+*.ironsrc.com
+*.supersonicads.com
+*.fyber.com
+*.hyprmx.com
+*.adxmi.com
+*.mintegral.com
+*.crosspromo.com

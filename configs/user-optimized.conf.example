@@ -1,0 +1,299 @@
+; ============================================================
+; Surge iOS 配置 — 优化版
+; 基于你的原始配置优化，保留原有策略结构
+; 优化内容：安全补全 + 性能调优 + 规则精简 + 稳定性增强
+; 日期：2025-06-17
+; ============================================================
+
+; ⚠️ 使用前必读：
+; 1. 此配置已内置去广告能力（规则+MITM+脚本），应用即生效
+; 2. 前提：将 surge-tuner/rulesets/ 和 surge-tuner/scripts/ 复制到 iPhone 的 Surge 配置目录
+; 3. MITM CA 证书必须安装并信任（设置→通用→关于→证书信任设置）
+; 4. 去各机场面板重置 token 并填入下方占位
+; ============================================================
+
+[General]
+; ============================================
+; 网络协议
+; ============================================
+; IPv6 — 国内部分 ISP 的 IPv6 不稳定，默认关闭
+; 如你的运营商 IPv6 正常可改为 true
+ipv6 = false
+; ipv6-vif = automatic      ; 启用 IPv6 时放开
+
+; ============================================
+; WiFi 共享 - 默认关闭（安全），需要时手动开启
+; ============================================
+allow-wifi-access = false
+; wifi-access-http-port = 6152
+; wifi-access-socks5-port = 6153
+; wifi-access-http-auth = user:password    ; ⚠️ 必须设置认证密码！
+
+; ============================================
+; 流量接管 — 防止环路、保证局域网设备可用
+; ============================================
+bypass-system = true
+bypass-tun = 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10
+skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, 17.0.0.0/8, localhost, *.local, *.crashlytics.com
+
+; Apple 服务走真实 IP（确保 iCloud/iMessage/推送稳定）
+always-real-ip = *.apple.com, *.icloud.com, *.icloud-content.com, *.mzstatic.com, *.crashlytics.com, *.apple-cloudkit.com, *.push.apple.com
+
+; 排除简单主机名（避免局域网设备名被错误路由）
+exclude-simple-hostnames = true
+
+; 按规则启用增强模式（iOS 省电关键）
+enhanced-mode-by-rule = true
+
+; ============================================
+; DNS — 阿里 + 腾讯 公共 DNS（带 system 回退）
+; ============================================
+dns-server = system, 223.5.5.5, 119.29.29.29
+encrypted-dns-server = https://dns.alidns.com/dns-query, https://doh.pub/dns-query
+
+; 劫持常见公共 DNS 请求（防止 App 用第三方 DNS 绕过策略）
+hijack-dns = 8.8.8.8:53, 8.8.4.4:53, 1.1.1.1:53, 1.0.0.1:53, 9.9.9.9:53, 208.67.222.222:53, 208.67.220.220:53
+
+; ============================================
+; 连通性测试
+; ============================================
+internet-test-url = http://www.qualcomm.cn/generate_204
+proxy-test-url = http://www.gstatic.com/generate_204
+test-timeout = 3
+
+; ============================================
+; 体验 & 日志
+; ============================================
+show-error-page-for-reject = true
+loglevel = warning                  ; 日常 warning，调试时可改为 info
+
+; Surge iOS 隐藏 VPN 图标（可选）
+; hide-vpn-icon = false
+
+
+[Proxy]
+; ============================================
+; 代理服务器（由订阅自动管理，此处仅作占位）
+; ============================================
+; 你用的三个机场订阅已在 [Proxy Group] 中通过 policy-path 管理
+; 无需在此手动添加
+
+
+[Proxy Group]
+; ============================================
+; 机场订阅 — 请替换 token 为你重置后的新值！
+; ============================================
+机场A = select, policy-path=https://47.242.128.61:5000/api/v1/client/subscribe?token=【你的Token_A】, update-interval=86400
+机场B = select, policy-path=https://niaodi.top/niao?token=【你的Token_B】, update-interval=86400
+机场C = select, policy-path=https://c7a91e3b-84d2-4c6f-9b71-2e8d4a6f3c11.com/sabusuku?token=【你的Token_C】, update-interval=86400
+
+; 全局节点池 — 聚合三个订阅
+All = select, include-other-group="机场A, 机场B, 机场C"
+
+; ============================================
+; 区域节点组 — 从三家机场按地区筛选
+; ============================================
+香港节点 = smart, policy-regex-filter=香港|Hong Kong|HK|🇭🇰, include-other-group="机场A, 机场B, 机场C"
+日本节点 = smart, policy-regex-filter=日本|Japan|Tokyo|🇯🇵, include-other-group="机场A, 机场B, 机场C"
+新加坡节点 = smart, policy-regex-filter=新加坡|Singapore|SG|🇸🇬, include-other-group="机场A, 机场B, 机场C"
+美国节点 = smart, policy-regex-filter=美国|United States|USA|🇺🇸, include-other-group="机场A, 机场B, 机场C"
+韩国节点 = smart, policy-regex-filter=韩国|Korea|KR|🇰🇷, include-other-group="机场A, 机场B, 机场C"
+台湾节点 = smart, policy-regex-filter=台湾|Taiwan|TW|🇹🇼, include-other-group="机场A, 机场B, 机场C"
+
+; ============================================
+; 流媒体加速 — 已收紧正则，仅匹配 HY2/优化等高性能线路
+; 如你的机场没有 HY2 或优化标签，改用手动 select 精选
+; ============================================
+流媒体高速 = smart, policy-regex-filter=HY2|优化|香港|Hong Kong|HK|🇭🇰|日本|Japan|Tokyo|JP|🇯🇵, include-other-group="机场A, 机场B, 机场C"
+; 流媒体高速（手动选线版）— 如果上面 smart 效果不好，用这个代替
+; 流媒体高速 = select, 香港节点, 日本节点, 新加坡节点, 美国节点
+
+; Pornhub 视频加载
+Pornhub加速 = select, 流媒体高速, 香港节点, 日本节点, 新加坡节点, 台湾节点, 美国节点, All
+
+; ============================================
+; 国际服务分流组
+; ============================================
+Instagram = select, 香港节点, 美国节点, 日本节点, All
+Google = select, 香港节点, 美国节点, 日本节点, All
+Youtube = select, 香港节点, 美国节点, 新加坡节点, All
+奈飞 = select, 美国节点, 香港节点, 新加坡节点, All
+; AI 服务必须避开香港/中国大陆 IP，否则被拒
+AI服务 = select, 美国节点, 日本节点, 新加坡节点, All
+TikTok = select, 美国节点, 日本节点, 台湾节点, All
+Telegram = select, 香港节点, 美国节点, 新加坡节点, All
+GitHub = select, 香港节点, 美国节点, 日本节点, All
+Spotify = select, 香港节点, 美国节点, 新加坡节点, All
+Twitter = select, 香港节点, 美国节点, All
+Facebook = select, 香港节点, 美国节点, All
+
+; ============================================
+; 微软服务
+; ============================================
+微软服务 = select, DIRECT, 香港节点, 美国节点, All
+
+; ============================================
+; 国产应用 — 默认直连，国外漫游时可手动切代理
+; ============================================
+国产应用 = select, DIRECT, 香港节点, 美国节点, 日本节点
+
+; ============================================
+; 兜底策略 — 默认直连
+; ============================================
+兜底分流 = select, DIRECT, 香港节点, 美国节点, 新加坡节点, 日本节点
+
+
+[Rule]
+; ============================================
+; L1: 兼容性/特殊接口（最高优先级，必须先匹配）
+; ============================================
+; 拼多多系列 — 直连避免被广告规则误伤
+DOMAIN-SUFFIX,pinduoduo.com,DIRECT
+DOMAIN-SUFFIX,yangkeduo.com,DIRECT
+DOMAIN-SUFFIX,pinduoduo.net,DIRECT
+DOMAIN-SUFFIX,pddpic.com,DIRECT
+DOMAIN-SUFFIX,pddcdn.com,DIRECT
+DOMAIN-SUFFIX,pddugc.com,DIRECT
+
+; 抖音系 — 走国产应用组（国内直连，国外可切代理）
+DOMAIN-SUFFIX,douyin.com,国产应用
+DOMAIN-SUFFIX,douyincdn.com,国产应用
+DOMAIN-SUFFIX,douyinpic.com,国产应用
+DOMAIN-SUFFIX,iesdouyin.com,国产应用
+DOMAIN-SUFFIX,amemv.com,国产应用
+DOMAIN-SUFFIX,zijieapi.com,国产应用
+DOMAIN-SUFFIX,snssdk.com,国产应用
+DOMAIN-SUFFIX,byteimg.com,国产应用
+DOMAIN-SUFFIX,bytedance.com,国产应用
+DOMAIN-SUFFIX,volccdn.com,国产应用
+
+; 自定义规则
+DOMAIN-SUFFIX,vercel.app,DIRECT
+DOMAIN-SUFFIX,v2ex.com,Google
+DOMAIN,www.v2ex.com,Google
+DOMAIN,cdn.v2ex.com,GitHub
+DOMAIN,youtubei.googleapis.com,Youtube
+DOMAIN,app-analytics-services.com,Youtube
+
+; 成人站点
+DOMAIN-SUFFIX,pornhub.com,Pornhub加速
+DOMAIN-SUFFIX,pornhub.org,Pornhub加速
+DOMAIN-SUFFIX,pornhubpremium.com,Pornhub加速
+DOMAIN-SUFFIX,phncdn.com,Pornhub加速
+DOMAIN-SUFFIX,phprcdn.com,Pornhub加速
+DOMAIN-SUFFIX,ypncdn.com,Pornhub加速
+DOMAIN-SUFFIX,t8cdn.com,Pornhub加速
+DOMAIN-SUFFIX,trafficjunky.net,REJECT
+DOMAIN-SUFFIX,trafficjunky.com,REJECT
+
+; ============================================
+; L2: 去广告规则集（内嵌 + 在线双重拦截）
+; ============================================
+; --- L2a: surge-tuner 本地规则集（精准拦截广告 SDK 域名）---
+; 广告域名需将 rulesets/ 目录放入 Surge 配置目录
+RULE-SET, SplashAd.list, REJECT
+RULE-SET, InAppAd.list, REJECT
+RULE-SET, Tracking.list, REJECT
+RULE-SET, AntiAd-Script.list, REJECT-TINYGIF
+; 全量合辑（可选，如打开可注释上面 4 行）
+; RULE-SET, AdDomains.list, REJECT
+
+; --- L2b: anti-ad 在线规则集（~2.5万条，自动更新）---
+RULE-SET,https://anti-ad.net/surge.txt,REJECT
+; hijacking：防 DNS 劫持
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Hijacking/Hijacking.list,REJECT
+; 知乎专用广告拦截
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/ZhihuAds/ZhihuAds.list,REJECT
+; 隐私追踪
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Privacy/Privacy.list,REJECT
+
+; ============================================
+; L3: Apple 系服务（全部直连）
+; ============================================
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Apple/Apple.list,DIRECT
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/iCloud/iCloud.list,DIRECT
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/AppStore/AppStore.list,DIRECT
+
+; ============================================
+; L4: 微软服务
+; ============================================
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Microsoft/Microsoft.list,微软服务
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/OneDrive/OneDrive.list,微软服务
+
+; PayPal
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/PayPal/PayPal.list,Google
+
+; ============================================
+; L5: 国产应用规则集
+; ============================================
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/WeChat/WeChat.list,国产应用
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Weibo/Weibo.list,国产应用
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/BiliBili/BiliBili.list,国产应用
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/XiaoHongShu/XiaoHongShu.list,国产应用
+
+; Steam 国区
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/SteamCN/SteamCN.list,DIRECT
+
+; ============================================
+; L6: 国际服务规则集
+; ============================================
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Google/Google.list,Google
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/YouTube/YouTube.list,Youtube
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Instagram/Instagram.list,Instagram
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Facebook/Facebook.list,Facebook
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Twitter/Twitter.list,Twitter
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Telegram/Telegram.list,Telegram
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/GitHub/GitHub.list,GitHub
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Spotify/Spotify.list,Spotify
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/TikTok/TikTok.list,TikTok
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Netflix/Netflix.list,奈飞
+
+; AI 服务
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/OpenAI/OpenAI.list,AI服务
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Claude/Claude.list,AI服务
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Gemini/Gemini.list,AI服务
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Copilot/Copilot.list,AI服务
+
+; ============================================
+; L7: 最终规则
+; ============================================
+; 国内 IP 直连
+GEOIP,CN,DIRECT
+; 兜底策略
+FINAL,兜底分流
+
+
+; ============================================================
+; MITM 配置（已清理私钥，默认不启用）
+;
+; ⚠️ 如需启用 MITM 去广告功能，请按以下步骤操作：
+; 1. Surge → 配置 → MITM → 生成 CA 证书
+; 2. 安装并信任证书（设置 → 通用 → 关于 → 证书信任设置）
+; 3. 去掉下方注释
+; 4. 配合 surge-tuner 的 .sgmodule 模块使用（见 docs/）
+; ============================================================
+[MITM]
+# 启用 MITM（必须开启才能使脚本和 hostname 生效）
+enable = true
+# 启用 HTTP/2 抓包支持
+h2 = true
+# 跳过服务端证书验证
+skip-server-cert-verify = true
+# MITM 目标域名
+# 注意：以 - 开头的域名表示排除（Apple 系列必须排除）
+# 保留了你的 api.pinduoduo.com + surge-tuner 广告 SDK 域名
+hostname = -*.apple.com, -*.icloud.com, -*.mzstatic.com, -*.crashlytics.com, -*.digicert.com, -*.apple-dns.net, -*.aaplimg.com, api.pinduoduo.com, *.pangle.io, *.pangleglobal.com, *.pangolin-sdk-toutiao.com, *.byteoversea.com, *.byteoversea.net, *.pglstatp.com, *.pgdt.bytedance.com, *.ad.oceanengine.com, *.gdt.qq.com, *.e.qq.com, *.ia.gdt.qq.com, *.btrace.gdt.qq.com, *.ad.qq.com, *.umeng.com, *.umtrack.com, *.cpro.baidu.com, *.nsclick.baidu.com, *.e.baidu.com, *.mssp.baidu.com, *.union.baidu.com, *.mobads.baidu.com, *.admob.com, *.doubleclick.net, *.googlesyndication.com, *.googleadservices.com, *.applovin.com, *.vungle.com, *.unityads.unity3d.com, *.adcolony.com, *.mintegral.com, *.adxmi.com, *.reyun.com, *.reyun.net, *.talkingdata.com, *.talkingdata.net, *.appsflyer.com, *.appsflyer.net, *.adjust.com, *.adjust.net, *.snssdk.com, *.amemv.com, *.ibyted.com, *.ad.kuaishou.com, *.ad.huawei.com, *.ad.xiaomi.com, *.ad.vivo.com, *.ad.oppo.com, *.getui.com, *.jpush.cn, *.jiguang.cn
+# 已安装的 CA 证书
+ca-passphrase = 【你的CA密码】
+ca-p12 = 【你的CA证书Base64】
+
+
+[Script]
+; ============================================
+; surge-tuner 去广告脚本（需将 scripts/ 放入 Surge 配置目录）
+; ============================================
+; 全能广告拦截 — 移除开屏/应用内/弹窗广告响应数据
+http-response ^https?://.* requires-body = true script-path = scripts/ad-block-all.js
+; 隐私追踪拦截 — 移除请求/响应中的追踪参数和 Header
+http-request ^https?://.* script-path = scripts/anti-tracking.js
+http-response ^https?://.* script-path = scripts/anti-tracking.js

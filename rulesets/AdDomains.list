@@ -1,0 +1,190 @@
+# 全量广告域名列表（合并 SplashAd + InAppAd + Tracking）
+# 适用规则行为：REJECT（直接拒绝连接）
+# 格式：DOMAIN-SUFFIX 或 DOMAIN-KEYWORD
+
+# ======== 开屏广告 ========
+
+# 穿山甲 / Pangle
+*.pangle.io
+*.pangleglobal.com
+*.pangolin-sdk-toutiao.com
+*.pangolin.snssdk.com
+*.byteoversea.com
+*.byteoversea.net
+*.pglstatp.com
+*.pgdt.bytedance.com
+*.ads-ad.pangle.io
+*.ad.oceanengine.com
+*.ad.toutiao.com
+*.pangle.voiceads.cn
+*.lf1.byteoversea.com
+*.lf3.byteoversea.com
+*.lf6.byteoversea.com
+*.lf9.byteoversea.com
+*.lf16.byteoversea.com
+*.sdkapi.byteoversea.com
+*.api.pangle.io
+
+# 广点通 / GDT
+*.gdt.qq.com
+*.e.qq.com
+*.ia.gdt.qq.com
+*.btrace.gdt.qq.com
+*.ad.qq.com
+*.adfilter.qq.com
+*.adsrv.qq.com
+*.rpt.gdt.qq.com
+*.adservicer.qq.com
+*.adsplash.qq.com
+
+# 友盟
+*.umeng.com
+*.umtrack.com
+*.umengcloud.com
+*.ulogs.umeng.com
+
+# 百度广告
+*.cpro.baidu.com
+*.cpro.static.baidu.com
+*.nsclick.baidu.com
+*.e.baidu.com
+*.mssp.baidu.com
+*.mobads.baidu.com
+*.union.baidu.com
+*.cb.baidu.com
+*.wk.baidu.com
+
+# 广告联盟
+*.admob.com
+*.googlesyndication.com
+*.doubleclick.net
+*.googleadservices.com
+*.pagead2.googlesyndication.com
+*.adservice.google.com
+*.applovin.com
+*.vungle.com
+*.unityads.unity3d.com
+*.adcolony.com
+*.chartboost.com
+*.tapjoy.com
+*.ironsrc.com
+*.mintegral.com
+*.adxmi.com
+
+# ======== 应用内广告 ========
+
+*.pangle.com
+*.pangle-adsapi.com
+*.ads-download.bytedance.com
+*.adx.pangle.io
+*.feedback.pangle.io
+*.ads.qq.com
+*.adcdn.qq.com
+*.adm.qq.com
+*.adpush.qq.com
+*.minigame.qq.com
+*.ad.kuaishou.com
+*.ads.kuaishou.com
+*.track.kuaishou.com
+*.ad.huawei.com
+*.ads.huawei.com
+*.ad.xiaomi.com
+*.ads.xiaomi.com
+*.mistat.xiaomi.com
+*.ad.vivo.com
+*.ad.oppo.com
+*.adm.baidu.com
+*.sdkapp.clip.baidu.com
+*.adplay.com
+*.smartadserver.com
+*.criteo.com
+*.criteo.net
+*.casalemedia.com
+*.openx.net
+*.pubmatic.com
+*.rubiconproject.com
+*.sovrn.com
+*.adnxs.com
+*.moatads.com
+*.moat.com
+
+# ======== 隐私追踪 ========
+
+# 热云数据
+*.reyun.com
+*.reyun.net
+*.log.reyun.com
+*.report.reyun.com
+
+# TalkingData
+*.talkingdata.com
+*.talkingdata.net
+*.sdk.talkingdata.com
+*.stat.talkingdata.com
+
+# GrowingIO / 神策
+*.growingio.com
+*.growingio.net
+*.sensorsdata.com
+*.sensorsdata.cn
+
+# AppsFlyer
+*.appsflyer.com
+*.appsflyer.net
+*.events.appsflyer.com
+
+# Adjust
+*.adjust.com
+*.adjust.net
+*.adjust.io
+
+# Google Analytics / Firebase
+*.google-analytics.com
+*.googletagmanager.com
+*.firebaseio.com
+*.app-measurement.com
+
+# Facebook
+*.connect.facebook.net
+*.graph.facebook.com
+*.analytics.facebook.com
+
+# 个推
+*.getui.com
+*.getui.net
+*.sdk.getui.com
+*.log.getui.com
+
+# 极光
+*.jpush.cn
+*.jpush.io
+*.jiguang.cn
+
+# Mixpanel / Amplitude / Segment
+*.mixpanel.com
+*.segment.com
+*.segment.io
+*.amplitude.com
+*.flurry.com
+*.localytics.com
+
+# 其他
+*.scorecardresearch.com
+*.comscore.com
+*.demdex.net
+*.krxd.net
+*.exelator.com
+*.bluekai.com
+*.rlcdn.com
+*.addthis.com
+*.outbrain.com
+*.taboola.com
+*.fullstory.com
+*.hotjar.com
+*.onesignal.com
+*.branch.io
+*.branch.com
+*.datadoghq.com
+*.nr-data.net
+*.sentry.io
+*.fingerprintjs.com

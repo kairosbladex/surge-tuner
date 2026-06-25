@@ -1,0 +1,66 @@
+# 需要脚本处理（MITM + JavaScript）的域名列表
+# 这些域名返回的广告数据嵌在正常 API 响应中，
+# 仅靠 REJECT 无法彻底去除，需要 MITM 解密后通过脚本修改响应体。
+# 适用规则行为：REJECT-TINYGIF（先拒绝，如果拒绝失败则返回 1x1 透明 gif）
+# 实际脚本匹配需配合 [MITM] hostname 和 [Script] http-response 使用
+
+# ======== 开屏广告 API（嵌入在 App 正常 API 中的广告）========
+
+# 抖音 / TikTok — 开屏广告接口
+*.snssdk.com
+*.amemv.com
+*.ibyted.com
+*.iesdouyin.com
+*.bytecdn.cn
+*.toutiaoapi.com
+
+# 微博 — 开屏广告 / 信息流广告
+*.weibo.com
+*.sinaimg.com
+*.sinaimg.cn
+*.sinajs.com
+*.wax.weibo.com
+
+# 微信朋友圈广告（需 MITM）
+*.weixin.com
+*.wx.qq.com
+*.wx.gtimg.com
+*.wxsnsdy.com
+
+# 知乎 — 开屏 / 信息流
+*.zhihu.com
+*.zhimg.com
+
+# 小红书
+*.xiaohongshu.com
+*.xhscdn.com
+
+# 百度 App
+*.baidu.com
+*.bdstatic.com
+*.baidustatic.com
+*.bcebos.com
+
+# 网易新闻
+*.163.com
+*.netease.com
+*.126.net
+
+# 今日头条
+*.toutiao.com
+*.toutiaoapi.com
+*.pstatp.com
+*.byteimg.com
+
+# ======== 应用内广告 API ========
+
+# 通用广告 API path 关键词（脚本端匹配）
+# 这些域名下的 /ads, /splash, /advert, /recommendation 等路径会返回广告
+DOMAIN-KEYWORD,ads
+DOMAIN-KEYWORD,advert
+DOMAIN-KEYWORD,splash
+DOMAIN-KEYWORD,promotion
+DOMAIN-KEYWORD,sponsor
+DOMAIN-KEYWORD,recommendation
+DOMAIN-KEYWORD,feed
+DOMAIN-KEYWORD,marketing

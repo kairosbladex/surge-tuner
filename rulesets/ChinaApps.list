@@ -1,0 +1,202 @@
+# 国内常用 App 域名白名单
+# 这些域名对应的 App 通常在境内使用，建议直连
+# 格式：DOMAIN-SUFFIX 或 DOMAIN-KEYWORD
+
+# 腾讯系
+qq.com
+*.qq.com
+tencent.com
+*.tencent.com
+weixin.com
+*.weixin.com
+wx.qq.com
+qpic.cn
+gtimg.cn
+gtimg.com
+dns.tencent.com
+tencent-cloud.com
+tencentcs.com
+tencentmind.com
+tenpay.com
+
+# 阿里系
+taobao.com
+*.taobao.com
+tmall.com
+*.tmall.com
+alibaba.com
+*.alibaba.com
+alibabausercontent.com
+alicdn.com
+alipay.com
+*.alipay.com
+alibaba-inc.com
+1688.com
+*.1688.com
+amap.com
+*.amap.com
+dingtalk.com
+*.dingtalk.com
+youku.com
+*.youku.com
+taobao.net
+
+# 字节跳动系
+bytedance.com
+*.bytedance.com
+byteimg.com
+toutiao.com
+*.toutiao.com
+douyin.com
+*.douyin.com
+douyinvod.com
+pstatp.com
+snssdk.com
+ixigua.com
+*.ixigua.com
+tiktok.com
+*.tiktok.com
+tik-tok.com
+amemv.com
+
+# 百度系
+baidu.com
+*.baidu.com
+baidustatic.com
+bdstatic.com
+bcebos.com
+baidubce.com
+baiducontent.com
+baidupcs.com
+tieba.com
+*.tieba.com
+baidubcr.com
+
+# 网易系
+163.com
+*.163.com
+126.com
+netease.com
+*.netease.com
+163yun.com
+163.com
+lofter.com
+
+# 新浪微博
+weibo.com
+*.weibo.com
+sina.com
+*.sina.com
+sinaimg.com
+*.sinaimg.com
+sinaimg.cn
+sinajs.com
+sinaimg.com.cn
+sina.com.cn
+
+# 美团系
+meituan.com
+*.meituan.com
+dianping.com
+*.dianping.com
+sankuai.com
+meituan.net
+
+# 京东系
+jd.com
+*.jd.com
+jdpay.com
+*.jdpay.com
+360buyimg.com
+jcloud.com
+jdcloud.com
+
+# 拼多多
+pinduoduo.com
+*.pinduoduo.com
+pddcdn.com
+yangkeduo.com
+
+# 小米系
+xiaomi.com
+*.xiaomi.com
+mi.com
+*.mi.com
+miui.com
+*.miui.com
+xiaomiyoupin.com
+xiaomi.net
+
+# 快手系
+kuaishou.com
+*.kuaishou.com
+kuaishou.net
+ksapisrv.com
+ks.com
+
+# B站
+bilibili.com
+*.bilibili.com
+bilibili.tv
+hdslb.com
+biliapi.com
+biligame.com
+
+# 华为系
+huawei.com
+*.huawei.com
+hicloud.com
+vmall.com
+*.vmall.com
+hichina.com
+huaweicloud.com
+huaweiqiankun.com
+
+# 滴滴
+didiglobal.com
+*.didiglobal.com
+xiaojukeji.com
+*.xiaojukeji.com
+didialipay.com
+
+# 360系
+360.cn
+*.360.cn
+qhimg.com
+qhres.com
+360safe.com
+360.com
+*.360.com
+
+# 知乎
+zhihu.com
+*.zhihu.com
+zhimg.com
+
+# 小红书
+xiaohongshu.com
+*.xiaohongshu.com
+xhscdn.com
+
+# 哔哩哔哩
+bilibili.com
+*.bilibili.com
+
+# 其他常用
+csdn.net
+*.csdn.net
+cnblogs.com
+zhangyue.com
+ctrip.com
+*.ctrip.com
+qunar.com
+*.qunar.com
+fliggy.com
+*.fliggy.com
+baishancloud.com
+upyun.com
+qbox.me
+qiniu.com
+qiniudns.com
+aliyuncs.com
+aliyundns.com

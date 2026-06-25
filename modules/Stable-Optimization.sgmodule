@@ -1,0 +1,44 @@
+#!name=Stable-Optimization
+#!desc=⚡ Surge 稳定性优化模块 — 解决断网/耗电/兼容性问题
+#!system=iOS
+#!requirement=CORE_VERSION>=20
+
+[General]
+; 跳过内网地址，避免 NAS/打印机/智能家居受影响
+bypass-tun = %APPEND% 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10
+skip-proxy = %APPEND% 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, *.local, *.localhost
+
+; Apple 服务走真实 IP（确保 iCloud/iMessage/推送稳定）
+always-real-ip = %APPEND% *.apple.com, *.icloud.com, *.icloud-content.com, *.mzstatic.com, *.crashlytics.com, *.apple-cloudkit.com, *.push.apple.com, *.digicert.com
+
+; 排除简单主机名（避免局域网设备名被错误路由）
+exclude-simple-hostnames = true
+
+; 按规则启用增强模式（省电优化）
+enhanced-mode-by-rule = true
+
+; DNS 并发查询（提升解析速度 + 容灾）
+dns-server = system, 223.5.5.5, 114.114.114.114
+
+; 关闭 IPv6 DNS（部分网络下 IPv6 会导致延迟）
+dns-ipv6 = false
+
+; 日志等级降到最低（减少写入，省电）
+loglevel = error
+
+[MITM]
+; 跳过服务端证书验证（减少 MITM 兼容性问题）
+skip-server-cert-verify = true
+
+[DNS Server]
+; 国内 DNS
+223.5.5.5 = system
+114.114.114.114 = system
+; 备用 DNS（当上述不可用时）
+119.29.29.29 = system
+
+[Host]
+; 常用网站的本地 DNS 映射（避免 DNS 污染/慢解析）
+; 可根据需要添加
+; ocsp.apple.com = 17.0.0.1
+; valid.apple.com = 17.0.0.1

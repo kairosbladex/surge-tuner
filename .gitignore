@@ -1,0 +1,21 @@
+# 操作系统
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# 编辑器
+.vscode/
+.idea/
+*.sublime-*
+
+# Surge 敏感信息（包含你的机场 token 和 CA 私钥）
+configs/user-optimized.conf
+configs/user-original.conf
+
+# Node
+node_modules/
+
+# 日志
+*.log

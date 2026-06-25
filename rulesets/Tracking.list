@@ -1,0 +1,178 @@
+# 隐私追踪域名列表
+# 用于拦截用户行为追踪、数据分析、统计 SDK
+# 格式：DOMAIN-SUFFIX 或 DOMAIN-KEYWORD
+
+# === 友盟 / Umeng（国内最广泛的统计 SDK）===
+*.umeng.com
+*.umtrack.com
+*.ulogs.umeng.com
+*.al.umeng.com
+*.msg.umeng.com
+*.error.umeng.com
+*.umsns.com
+*.up.umeng.com
+
+# === 腾讯移动分析 ===
+*.mta.qq.com
+*.mtacdn.qq.com
+*.pingma.qq.com
+*.tajs.qq.com
+*.btrace.qq.com
+*.btrace.gdt.qq.com
+*.sngapm.qq.com
+*.hir.qq.com
+
+# === 百度统计 ===
+*.hm.baidu.com
+*.tongji.baidu.com
+*.dup.baidustatic.com
+*.log.baidu.com
+*.bcelive.baidu.com
+*.bav.baidu.com
+
+# === 阿里云数据分析 ===
+*.click.taobao.com
+*.log.mmstat.com
+*.mmstat.com
+*.s.tbcdn.cn
+*.log.umeng.com
+*.ucdata.uc.cn
+*.open-api.uc.cn
+
+# === 热云数据 ===
+*.reyun.com
+*.reyun.net
+*.log.reyun.com
+*.report.reyun.com
+*.adata.reyun.com
+
+# === TalkingData ===
+*.talkingdata.com
+*.talkingdata.net
+*.tdc. talkingdata.com
+*.sdk.talkingdata.com
+*.stat.talkingdata.com
+*.logs.talkingdata.com
+*.tdc-main.talkingdata.com
+
+# === GrowingIO ===
+*.growingio.com
+*.growingio.net
+*.growingio.cn
+*.api.growingio.com
+*.logs.growingio.com
+
+# === Sensors Analytics（神策数据）===
+*.sensorsdata.com
+*.sensorsdata.cn
+*.datasink.sensorsdata.com
+*.sa.sensorsdata.com
+
+# === AppsFlyer ===
+*.appsflyer.com
+*.appsflyer.net
+*.events.appsflyer.com
+*.sdk.appsflyer.com
+*.stats.appsflyer.com
+*.conversions.appsflyer.com
+*.one.appsflyer.com
+*.attribution.appsflyer.com
+
+# === Adjust ===
+*.adjust.com
+*.adjust.net
+*.adjust.io
+*.app.adjust.com
+*.dtrck.adjust.com
+*.sdk.adjust.com
+
+# === Firebase / Google Analytics ===
+*.google-analytics.com
+*.googletagmanager.com
+*.firebaseio.com
+*.app-measurement.com
+*.region.google-analytics.com
+*.analytics.google.com
+*.ssl.google-analytics.com
+
+# === Facebook Analytics ===
+*.facebook.com
+*.facebook.net
+*.connect.facebook.net
+*.graph-video.facebook.com
+*.graph.facebook.com
+*.analytics.facebook.com
+*.p.facebook.com
+
+# === 中国移动分析 ===
+*.mdn.open.one
+*.one.analytics.com
+*.analytics.10086.cn
+
+# === 个推 / Getui ===
+*.getui.com
+*.getui.net
+*.gtc.getui.com
+*.gtd.getui.com
+*.sdk.getui.com
+*.log.getui.com
+*.upush.getui.com
+*.c.getui.com
+
+# === 极光推送 ===
+*.jpush.cn
+*.jpush.io
+*.jiguang.cn
+*.analytics.jpush.cn
+*.sdk.jpush.cn
+*.log.jpush.cn
+
+# === 融云 ===
+*.rongcloud.cn
+*.rongcloud.net
+*.nav.cn.ronghub.com
+*.cn.ronghub.com
+
+# === 其他追踪 ===
+*.mixpanel.com
+*.segment.com
+*.segment.io
+*.amplitude.com
+*.localytics.com
+*.flurry.com
+*.countly.com
+*.keen.io
+*.heap.com
+*.customer.io
+*.intercom.io
+*.optimizely.com
+*.fullstory.com
+*.hotjar.com
+*.mouseflow.com
+*.crazyegg.com
+*.clicky.com
+*.mousestats.com
+*.luckyorange.com
+*.pushwoosh.com
+*.airship.com
+*.batch.com
+*.onesignal.com
+*.urbanairship.com
+*.branch.io
+*.branch.com
+*.fingerprintjs.com
+*.fpfjs.com
+*.datadoghq.com
+*.datadog.com
+*.newrelic.com
+*.nr-data.net
+*.bugsnag.com
+*.sentry.io
+*.crashlytics.com
+*.fabric.io
+
+# === 浏览器指纹 ===
+*.fingerprint.com
+*.fingerprintjs.com
+*.fpjs.io
+*.checkssl.com
