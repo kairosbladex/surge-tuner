@@ -13,6 +13,14 @@ Thumbs.db
 # Surge 敏感信息（包含你的机场 token 和 CA 私钥）
 configs/user-optimized.conf
 configs/user-original.conf
+configs/reference-golden.conf
+configs/generated/
+
+# AI 会话数据
+.reasonix/
+
+# 运行时生成的文件
+kelee/list.json
 
 # Node
 node_modules/
