@@ -1,5 +1,41 @@
 # 模块测试指南 — 在 iPhone 上验证去广告是否生效
 
+## 自动化检查（导入前必须做）
+
+在把配置放到 iPhone 前，先在仓库根目录运行：
+
+```bash
+npm run check
+npm test
+npm run validate
+```
+
+生成新配置时先跑：
+
+```bash
+npm run generate -- --input tests/fixtures/sample-generator-input.json --output configs/generated/sample.conf
+npm run generate -- --address-file tests/fixtures/sample-subscription.txt --services Telegram,ChatGPT --adblock --output configs/generated/from-subscription.conf
+node scripts/surge-config-validator.js configs/generated/sample.conf
+```
+
+`surge-config-generator.js` 默认会在写出前自检，发现 error 会直接失败。需要让 warning 也失败时加 `--strict`；只有调试生成器本身时才加 `--skip-validate`。
+
+校验器会检查：
+
+- 本地 `RULE-SET` 文件是否存在
+- `script-path` 文件是否存在
+- 规则引用的策略组是否已定义
+- 策略组引用的节点或其他策略组是否已定义
+- 是否使用了需要复核的非标准策略类型
+- 模块中是否包含需要复核的 MITM/Body Rewrite 写法
+
+地址解析链路支持：
+
+- 单节点 URI：`ss://`、`trojan://`、`vmess://`、`hy2://`/`hysteria2://`、`tuic://`
+- 明文订阅文件：每行一个节点 URI
+- Base64 订阅文件：解码后每行一个节点 URI
+- HTTP(S) 订阅 URL：由生成器拉取内容后按上述规则解析
+
 ## 方法一：观察法（最直观）
 
 1. **开屏广告测试**

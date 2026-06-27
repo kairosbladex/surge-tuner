@@ -45,7 +45,7 @@ always-real-ip = *.apple.com, *.icloud.com, *.icloud-content.com, *.mzstatic.com
 | 检查项 | 方法 |
 |--------|------|
 | MITM 证书是否已安装并信任 | 设置 → 通用 → 关于 → 证书信任设置 |
-| MITM 是否已开启 | Surge → 配置 → MITM 开关 |
+| MITM 是否已开启 | Surge → 配置 → MITM 开关；模块不会主动开启 MITM |
 | hostname 是否包含了广告域名 | Surge → 配置 → MITM → hostname |
 | 脚本是否匹配到了 | Surge → 最近请求 → 查看脚本执行状态 |
 | 广告是否在规则集中 | 检查 rulesets 中是否包含该域名 |

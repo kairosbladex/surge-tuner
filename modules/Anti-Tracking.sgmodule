@@ -6,11 +6,10 @@
 [MITM]
 hostname = -*.apple.com, -*.icloud.com, *.umeng.com, *.umtrack.com, *.ulogs.umeng.com, *.reyun.com, *.reyun.net, *.talkingdata.com, *.talkingdata.net, *.appsflyer.com, *.appsflyer.net, *.adjust.com, *.adjust.net, *.adjust.io, *.getui.com, *.getui.net, *.jpush.cn, *.jpush.io, *.jiguang.cn, *.growingio.com, *.growingio.net, *.sensorsdata.com, *.sensorsdata.cn, *.google-analytics.com, *.googletagmanager.com, *.firebaseio.com, *.mixpanel.com, *.segment.com, *.amplitude.com, *.flurry.com
 skip-server-cert-verify = true
-enable = true
 
 [Rule]
 ; 追踪域名 — 直接拒绝
-RULE-SET, Tracking.list, REJECT
+RULE-SET,rulesets/Tracking.list, REJECT
 
 [Script]
 ; 请求端 — 移除追踪参数和 Header

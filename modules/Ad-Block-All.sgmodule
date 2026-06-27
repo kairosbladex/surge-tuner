@@ -6,13 +6,12 @@
 [MITM]
 hostname = -*.apple.com, -*.icloud.com, -*.mzstatic.com, -*.crashlytics.com, -*.digicert.com, -*.apple-dns.net, -*.aaplimg.com, *.pangle.io, *.pangleglobal.com, *.pangolin-sdk-toutiao.com, *.byteoversea.com, *.byteoversea.net, *.pglstatp.com, *.pgdt.bytedance.com, *.ad.oceanengine.com, *.gdt.qq.com, *.e.qq.com, *.ia.gdt.qq.com, *.btrace.gdt.qq.com, *.ad.qq.com, *.umeng.com, *.umtrack.com, *.cpro.baidu.com, *.nsclick.baidu.com, *.e.baidu.com, *.mssp.baidu.com, *.union.baidu.com, *.mobads.baidu.com, *.admob.com, *.doubleclick.net, *.googlesyndication.com, *.googleadservices.com, *.applovin.com, *.vungle.com, *.unityads.unity3d.com, *.adcolony.com, *.mintegral.com, *.snssdk.com, *.amemv.com, *.ibyted.com, *.ad.kuaishou.com, *.ad.huawei.com, *.ad.xiaomi.com, *.ad.vivo.com, *.ad.oppo.com, *.reyun.com, *.reyun.net, *.talkingdata.com, *.talkingdata.net, *.appsflyer.com, *.appsflyer.net, *.adjust.com, *.adjust.net, *.getui.com, *.jpush.cn, *.jiguang.cn, *.growingio.com, *.sensorsdata.com
 skip-server-cert-verify = true
-enable = true
 
 [Rule]
 ; 广告域名 — 直接拒绝
-RULE-SET, AdDomains.list, REJECT
+RULE-SET,rulesets/AdDomains.list, REJECT
 ; 需脚本处理
-RULE-SET, AntiAd-Script.list, REJECT-TINYGIF
+RULE-SET,rulesets/AntiAd-Script.list, REJECT-TINYGIF
 
 [Script]
 ; 全能广告拦截脚本

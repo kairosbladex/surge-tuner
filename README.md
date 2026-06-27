@@ -56,6 +56,42 @@ Agent 会自动执行对应工作流，与你交互确认后生成配置。
 
 将 `modules/` 下的 `.sgmodule` 文件放入 Surge 配置目录即可启用。
 
+### 方式四：可执行生成与校验（推荐给 Agent / 维护者）
+
+本仓库现在提供零依赖 Node 工具，把配置生成和风险检查从“只靠提示词”收敛为可验证的 Module：
+
+```bash
+npm run generate -- --input tests/fixtures/sample-generator-input.json --output configs/generated/sample.conf
+npm run generate -- --address "trojan://password@example.com:443?sni=example.com#美国-US-01" --services Telegram,ChatGPT --output configs/generated/from-address.conf
+npm run generate -- --address-file tests/fixtures/sample-subscription.txt --services Telegram,ChatGPT --adblock --output configs/generated/from-subscription.conf
+npm run check
+npm run validate
+npm test
+```
+
+- `scripts/surge-config-generator.js`：读取结构化 JSON，生成 Surge for iOS 配置
+- `scripts/surge-proxy-parser.js`：解析 `ss://`、`trojan://`、`vmess://`、`hy2://`/`hysteria2://`、`tuic://` 和 Base64/明文订阅
+- `scripts/surge-config-validator.js`：检查本地规则文件、脚本路径、策略组引用、非标准策略类型和模块高风险字段
+- `rules/services/service-catalog.json`：服务 → 规则集 → 策略组的结构化目录
+
+生成器默认会在写出前调用校验器；发现 error 会拒绝输出成品配置。需要把 warning 也当失败时加 `--strict`，只有排查生成器本身时才使用 `--skip-validate`。
+
+### 方式五：A2A Remote Agent（给其他 Agent 调用）
+
+启动本地 A2A HTTP+JSON 服务：
+
+```bash
+npm run start:a2a
+```
+
+默认地址：`http://127.0.0.1:8787`
+
+- Agent Card：`GET /.well-known/agent-card.json`
+- 发送生成任务：`POST /message:send`
+- 查询任务：`GET /tasks/{id}`
+
+详见 `docs/a2a.md`。当前 MVP 支持同步生成 Surge 配置和轮询任务结果，暂不支持 streaming、push notification 和 OAuth。
+
 ---
 
 ## 📁 项目结构
@@ -81,6 +117,11 @@ surge-tuner/
 │   ├── Ad-Block-All.sgmodule       # 全能广告合辑
 │   └── Stable-Optimization.sgmodule # 稳定性优化
 ├── scripts/                  # Surge JavaScript 脚本
+│   ├── a2a-agent.js          # A2A 任务适配层
+│   ├── a2a-server.js         # A2A HTTP+JSON 服务入口
+│   ├── surge-config-generator.js # 配置生成 CLI（Agent 调用入口）
+│   ├── surge-proxy-parser.js # 节点 URI / 订阅内容解析
+│   ├── surge-config-validator.js # 配置校验 CLI（导入前检查）
 │   ├── ad-block-all.js       # 全能广告拦截
 │   ├── anti-tracking.js      # 隐私追踪拦截
 │   └── ...                   # 更多脚本
@@ -95,6 +136,7 @@ surge-tuner/
 │   └── LAN.list              # 局域网
 ├── rules/                    # 🔥 规则注册表（Agent 核心参考）
 │   ├── services/README.md    # 服务→区域策略映射
+│   ├── services/service-catalog.json # 服务规则结构化目录
 │   ├── regions/detection-rules.md  # 节点区域检测规则
 │   └── protocols/protocols.md      # 代理协议解析规则
 ├── kelee/                    # 🔥 kelee.one 去广告插件集成
@@ -107,6 +149,7 @@ surge-tuner/
     ├── troubleshooting.md    # 故障排除
     ├── testing-guide.md      # 测试指南
     └── cross-platform-conversion.md  # 🔥 跨平台转换指南
+tests/                        # 生成器和校验器测试
 ```
 
 ---
@@ -142,6 +185,15 @@ surge-tuner/
     │    + 安装指导 + 注意事项              │
     └─────────────────────────────────────┘
 ```
+
+### Agent 执行契约
+
+Agent 生成 Surge 配置时应优先走可执行 Module：
+
+1. 用户给单节点 URI 或订阅 URL/文件时，优先调用 `node scripts/surge-config-generator.js --address <uri-or-url> --services <list> --output <profile.conf>`
+2. 用户给结构化需求时，调用 `node scripts/surge-config-generator.js --input <input.json> --output <profile.conf>`
+3. 生成器默认会自检；如手工补过配置，必须再调用 `node scripts/surge-config-validator.js <profile.conf>` 检查输出
+4. 只有校验无 error 时才把配置交给用户；warning 必须说明风险和处理建议，严谨交付时加 `--strict`
 
 ---
 

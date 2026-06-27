@@ -6,16 +6,11 @@
 [MITM]
 hostname = -*.apple.com, -*.icloud.com, -*.mzstatic.com, -*.crashlytics.com, -*.digicert.com, -*.apple-dns.net, -*.aaplimg.com, *.pangle.io, *.pangle.com, *.pangolin-sdk-toutiao.com, *.byteoversea.com, *.pgdt.bytedance.com, *.gdt.qq.com, *.e.qq.com, *.ia.gdt.qq.com, *.ads.qq.com, *.adcdn.qq.com, *.ad.qq.com, *.cpro.baidu.com, *.e.baidu.com, *.mssp.baidu.com, *.mobads.baidu.com, *.union.baidu.com, *.ad.kuaishou.com, *.ads.kuaishou.com, *.track.kuaishou.com, *.ad.huawei.com, *.ads.huawei.com, *.ad.xiaomi.com, *.ads.xiaomi.com, *.mistat.xiaomi.com, *.ad.vivo.com, *.ad.oppo.com, *.mintegral.com, *.mintegral.net, *.adxmi.com, *.applovin.com, *.vungle.com, *.unityads.unity3d.com, *.adcolony.com, *.chartboost.com, *.tapjoy.com, *.ironsrc.com, *.smartadserver.com, *.criteo.com, *.adnxs.com, *.adsafeprotected.com, *.doubleclick.net, *.googlesyndication.com, *.googleadservices.com, *.moatads.com, *.amazon-adsystem.com
 skip-server-cert-verify = true
-enable = true
 
 [Rule]
 ; 应用内广告域名 — 直接拒绝
-RULE-SET, InAppAd.list, REJECT
+RULE-SET,rulesets/InAppAd.list, REJECT
 
 [Script]
 ; 应用内广告响应体清洗
 http-response ^https?://.* requires-body = true script-path = scripts/remove-banner-ad.js
-
-[Body Rewrite]
-; 备用方案：替换 JSON 中的广告字段（更精确的匹配）
-; ^https?://.+\/(banner|interstitial|reward|native_ad|feed_ad|splash_ad)\.json response-body "banner_data":" replace ""

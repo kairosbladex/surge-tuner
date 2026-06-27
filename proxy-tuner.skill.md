@@ -19,6 +19,49 @@ Proxy Tuner 是一个纯交互式 Agent Skill，能根据用户提供的机场�
 
 ## 🧠 核心工作流
 
+### 可执行 Module 优先
+
+生成 Surge 配置时，优先调用仓库内可执行 Module，而不是只手写配置：
+
+```bash
+node scripts/surge-config-generator.js --address <uri-or-subscription-url> --services Telegram,ChatGPT --output <profile.conf>
+node scripts/surge-config-generator.js --address-file <subscription.txt> --services Telegram,ChatGPT --adblock --output <profile.conf>
+node scripts/surge-config-generator.js --input <input.json> --output <profile.conf>
+node scripts/surge-config-validator.js <profile.conf>
+```
+
+约束：
+- `surge-config-generator.js` 默认会在写出前自检；除非调试生成器本身，不要使用 `--skip-validate`
+- 校验结果有 `error` 时，不要把配置作为可导入成品交付
+- 校验结果有 `warning` 时，必须向用户说明风险，例如裸 `RULE-SET` 路径、非标准策略类型、模块 MITM 字段
+- 严谨交付或发布示例配置时，生成命令加 `--strict`，把 warning 也当失败处理
+- 只有生成器当前不覆盖的场景，才手工补配置；补完后仍必须运行校验器
+- 地址解析当前覆盖 `ss://`、`trojan://`、`vmess://`、`hy2://`/`hysteria2://`、`tuic://`，以及明文/Base64 订阅内容
+
+### A2A Remote Agent 入口
+
+当调用方是另一个 agent，并且需要通过协议发现和任务结果获取，而不是直接执行本地 CLI 时，启动 A2A 服务：
+
+```bash
+npm run start:a2a
+```
+
+调用入口：
+
+- `GET /.well-known/agent-card.json`：发现 agent 能力
+- `POST /message:send`：提交 Surge 配置生成任务
+- `GET /tasks/{id}`：查询 task/artifacts
+
+请求正文优先使用 `parts[].data` 传结构化输入，例如：
+
+```json
+{
+  "address": "trojan://secret@example.com:443?sni=example.com#US-01",
+  "services": ["Telegram", "ChatGPT"],
+  "adBlock": true
+}
+```
+
 ### 工作流 0：识别用户场景
 
 当用户发起请求时，首先识别其意图：
@@ -41,12 +84,21 @@ Proxy Tuner 是一个纯交互式 Agent Skill，能根据用户提供的机场�
 #### 步骤 1.1：获取订阅内容
 
 ```
-用户提供 URL → Agent 用 web_fetch 获取订阅数据
+用户提供 URL/节点 URI → Agent 调用 surge-config-generator 获取并解析
 ```
 
 - 如果是 Base64 编码 → 先解码再解析
 - 如果是 Clash YAML/JSON → 直接解析
 - 如果是普通 URI 列表 → 逐行解析
+
+优先执行：
+
+```bash
+node scripts/surge-config-generator.js --address <uri-or-subscription-url> --services <服务列表> --output <profile.conf>
+node scripts/surge-config-validator.js <profile.conf> # 手工补配置后再跑
+```
+
+只有当前生成器不支持的格式（例如复杂 Clash provider YAML）才手工解析。
 
 #### 步骤 1.2：解析节点列表
 
@@ -173,6 +225,8 @@ Proxy Tuner 是一个纯交互式 Agent Skill，能根据用户提供的机场�
 
 当用户要求生成配置文件时，按以下步骤生成完整的 Surge 配置。
 
+> 优先路径：将用户确认后的订阅和服务选择整理为 JSON，调用 `scripts/surge-config-generator.js` 生成，再调用 `scripts/surge-config-validator.js` 校验。
+
 #### 步骤 2.1：获取基础模板
 
 从以下模板中选择基础：
@@ -201,7 +255,7 @@ Proxy Tuner 是一个纯交互式 Agent Skill，能根据用户提供的机场�
 
 **参考黄金配置的模式（推荐 — 已验证的 Surge iOS 配置）：**
 
-使用 `smart` 策略（Surge 专属，智能选择节点）+ 多机场聚合：
+默认使用 `url-test` 策略（自动测速，兼容性更稳）+ 多机场聚合：
 
 ```ini
 [Proxy Group]
@@ -213,24 +267,24 @@ Proxy Tuner 是一个纯交互式 Agent Skill，能根据用户提供的机场�
 # 全局节点池 — 聚合所有订阅，供手动选节点兜底
 All = select, include-other-group="机场A, 机场B, 机场C"
 
-# ===== 区域策略组 - Smart 智能选择（Surge 专属） =====
+# ===== 区域策略组 - url-test 自动测速 =====
 # 直接从三家机场筛选，避免 All 中转确保节点名能被识别
 # 正则匹配中文名 + emoji 国旗 + 英文缩写 + 城市名
-🇭🇰 香港节点 = smart, policy-regex-filter=香港|Hong Kong|HK|🇭🇰, include-other-group="机场A, 机场B, 机场C"
-🇯🇵 日本节点 = smart, policy-regex-filter=日本|Japan|Tokyo|🇯🇵, include-other-group="机场A, 机场B, 机场C"
-🇸🇬 新加坡节点 = smart, policy-regex-filter=新加坡|Singapore|SG|🇸🇬, include-other-group="机场A, 机场B, 机场C"
-🇺🇸 美国节点 = smart, policy-regex-filter=美国|United States|USA|🇺🇸, include-other-group="机场A, 机场B, 机场C"
-🇰🇷 韩国节点 = smart, policy-regex-filter=韩国|Korea|KR|🇰🇷, include-other-group="机场A, 机场B, 机场C"
-🇹🇼 台湾节点 = smart, policy-regex-filter=台湾|Taiwan|TW|🇹🇼, include-other-group="机场A, 机场B, 机场C"
+🇭🇰 香港节点 = url-test, policy-regex-filter=香港|Hong Kong|HK|🇭🇰, include-other-group="机场A, 机场B, 机场C", url=http://www.gstatic.com/generate_204, interval=600, tolerance=50
+🇯🇵 日本节点 = url-test, policy-regex-filter=日本|Japan|Tokyo|🇯🇵, include-other-group="机场A, 机场B, 机场C", url=http://www.gstatic.com/generate_204, interval=600, tolerance=50
+🇸🇬 新加坡节点 = url-test, policy-regex-filter=新加坡|Singapore|SG|🇸🇬, include-other-group="机场A, 机场B, 机场C", url=http://www.gstatic.com/generate_204, interval=600, tolerance=50
+🇺🇸 美国节点 = url-test, policy-regex-filter=美国|United States|USA|🇺🇸, include-other-group="机场A, 机场B, 机场C", url=http://www.gstatic.com/generate_204, interval=600, tolerance=50
+🇰🇷 韩国节点 = url-test, policy-regex-filter=韩国|Korea|KR|🇰🇷, include-other-group="机场A, 机场B, 机场C", url=http://www.gstatic.com/generate_204, interval=600, tolerance=50
+🇹🇼 台湾节点 = url-test, policy-regex-filter=台湾|Taiwan|TW|🇹🇼, include-other-group="机场A, 机场B, 机场C", url=http://www.gstatic.com/generate_204, interval=600, tolerance=50
 
 # ===== 流媒体加速 — 优先 HY2/优化线路及亚洲近端流媒体地区 =====
-流媒体高速 = smart, policy-regex-filter=🇭🇰|香港|Hong Kong|HK|🇯🇵|日本|Japan|Tokyo|JP|🇸🇬|新加坡|Singapore|SG|🇹🇼|台湾|Taiwan|TW|🇺🇸|美国|United States|USA|US|🇩🇪|德国|Germany|DE|HY2|优化, include-other-group="机场A, 机场B, 机场C"
+流媒体高速 = url-test, policy-regex-filter=🇭🇰|香港|Hong Kong|HK|🇯🇵|日本|Japan|Tokyo|JP|🇸🇬|新加坡|Singapore|SG|🇹🇼|台湾|Taiwan|TW|🇺🇸|美国|United States|USA|US|🇩🇪|德国|Germany|DE|HY2|优化, include-other-group="机场A, 机场B, 机场C", url=http://www.gstatic.com/generate_204, interval=600, tolerance=50
 ```
 
 **备选方案：**
 - 单机场用户 → 将 `机场A, 机场B, 机场C` 替换为单个订阅名
-- 如需 url-test → 将 `smart` 改为 `url-test, url=http://www.gstatic.com/generate_204, interval=600, tolerance=50`
-- 如需手动选择 → 将 `smart` 改为 `select`
+- 如明确确认 Surge 版本支持 `smart` → 可把区域组类型从 `url-test` 改为 `smart`
+- 如需手动选择 → 将 `url-test` 改为 `select`
 
 #### 步骤 2.4：生成服务策略组（动态）
 
@@ -446,10 +500,10 @@ loglevel = warning
 ```ini
 [Rule]
 # 引入 surge-tuner 的规则集
-RULE-SET, SplashAd.list, REJECT
-RULE-SET, InAppAd.list, REJECT
-RULE-SET, Tracking.list, REJECT
-RULE-SET, AntiAd-Script.list, REJECT-TINYGIF
+RULE-SET,rulesets/SplashAd.list, REJECT
+RULE-SET,rulesets/InAppAd.list, REJECT
+RULE-SET,rulesets/Tracking.list, REJECT
+RULE-SET,rulesets/AntiAd-Script.list, REJECT-TINYGIF
 # 在线 anti-ad 规则集
 RULE-SET,https://anti-ad.net/surge.txt,REJECT
 RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Hijacking/Hijacking.list,REJECT
@@ -574,6 +628,6 @@ RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/r
 4. **策略类型选择原则**：
    - 延迟敏感（浏览/社交/代码）→ `url-test`
    - 解锁需求（流媒体/AI）→ `select`
-   - Surge 专属 → `smart`（如用户明确要求）
+   - Surge 专属 → `smart`（仅在明确确认目标 Surge 版本支持时使用）
 5. **subscription token 必须由用户替换** — 配置中使用 `【你的Token】` 占位
 6. **纯 Agent Skill** — 所有逻辑通过 Agent 交互完成，不依赖外部程序

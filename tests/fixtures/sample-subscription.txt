@@ -1,0 +1,2 @@
+trojan://secret@hk.example.com:443?sni=hk.example.com#香港-HK-01
+trojan://secret@us.example.com:443?sni=us.example.com#美国-US-01

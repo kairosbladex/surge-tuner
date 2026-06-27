@@ -23,6 +23,10 @@ Surge 模块（`.sgmodule` 文件）是一种可以独立安装和启用的配�
 
 ## 模块列表详解
 
+## MITM 前提
+
+去广告脚本依赖 MITM 解密。模块只追加 hostname、规则和脚本，不主动开启 MITM；请先在 Surge 主配置或 App 设置中开启 MITM，并安装、信任 Surge CA 证书。
+
 ### 🚀 Anti-Splash-Ad（开屏广告拦截）
 
 **功能**：拦截 App 启动时的全屏广告

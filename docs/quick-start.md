@@ -48,6 +48,8 @@
 2. 确保 **MITM 开关** 已开启
 3. hostname 字段已由模块自动配置
 
+> 模块只追加 MITM hostname、规则和脚本，不主动开启 MITM。去广告脚本要生效，必须在 Surge 主配置或 App 设置中开启 MITM 并信任 CA。
+
 ### Step 5: 启动 Surge
 
 1. 回到 Surge 主界面

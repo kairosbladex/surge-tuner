@@ -2,6 +2,15 @@
 
 Agent 在解析机场订阅（Base64/Clash/普通格式）时，需要识别各代理协议并正确生成配置。
 
+当前可执行入口：
+
+```bash
+node scripts/surge-config-generator.js --address <uri-or-subscription-url> --services Telegram,ChatGPT --output <profile.conf>
+node scripts/surge-config-validator.js <profile.conf>
+```
+
+解析实现位于 `scripts/surge-proxy-parser.js`，当前覆盖 `ss://`、`trojan://`、`vmess://`、`hy2://`/`hysteria2://`、`tuic://`，以及明文/Base64 订阅内容。
+
 ## 常见协议格式
 
 ### Shadowsocks (SS)
@@ -107,7 +116,7 @@ name = tuic, server, port, token=xxx, uuid=xxx, quic-disabled=0, congestion-cont
 
 ## Surge 外部代理支持
 
-对于 Surge 不原生支持的协议（SSR、VLESS、TUIC 等）：
+对于 Surge 不原生支持的协议（SSR、VLESS 等）：
 
 ```ini
 # 使用 Surge External 代理程序

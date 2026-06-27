@@ -1,0 +1,116 @@
+{
+  "Telegram": {
+    "aliases": ["telegram", "tg"],
+    "group": "Telegram",
+    "rules": ["Telegram/Telegram.list"],
+    "policies": ["香港节点", "美国节点", "新加坡节点", "All"]
+  },
+  "YouTube": {
+    "aliases": ["youtube", "yt"],
+    "group": "Youtube",
+    "rules": ["YouTube/YouTube.list", "YouTubeMusic/YouTubeMusic.list"],
+    "policies": ["香港节点", "美国节点", "新加坡节点", "All"]
+  },
+  "Google": {
+    "aliases": ["google"],
+    "group": "Google",
+    "rules": ["Google/Google.list"],
+    "policies": ["香港节点", "美国节点", "日本节点", "All"]
+  },
+  "GitHub": {
+    "aliases": ["github"],
+    "group": "GitHub",
+    "rules": ["GitHub/GitHub.list"],
+    "policies": ["香港节点", "美国节点", "日本节点", "All"]
+  },
+  "Netflix": {
+    "aliases": ["netflix"],
+    "group": "奈飞",
+    "rules": ["Netflix/Netflix.list"],
+    "policies": ["美国节点", "香港节点", "新加坡节点", "All"]
+  },
+  "Disney+": {
+    "aliases": ["disney", "disney+"],
+    "group": "Disney+",
+    "rules": ["Disney/Disney.list"],
+    "policies": ["美国节点", "新加坡节点", "日本节点", "All"]
+  },
+  "ChatGPT": {
+    "aliases": ["chatgpt", "openai"],
+    "group": "AI服务",
+    "rules": ["OpenAI/OpenAI.list"],
+    "policies": ["美国节点", "日本节点", "新加坡节点", "All"]
+  },
+  "Claude": {
+    "aliases": ["claude", "anthropic"],
+    "group": "AI服务",
+    "rules": ["Claude/Claude.list"],
+    "policies": ["美国节点", "日本节点", "新加坡节点", "All"]
+  },
+  "Gemini": {
+    "aliases": ["gemini"],
+    "group": "AI服务",
+    "rules": ["Gemini/Gemini.list"],
+    "policies": ["美国节点", "日本节点", "新加坡节点", "All"]
+  },
+  "Copilot": {
+    "aliases": ["copilot", "github copilot"],
+    "group": "AI服务",
+    "rules": ["Copilot/Copilot.list"],
+    "policies": ["美国节点", "日本节点", "新加坡节点", "All"]
+  },
+  "Twitter": {
+    "aliases": ["twitter", "x"],
+    "group": "Twitter",
+    "rules": ["Twitter/Twitter.list"],
+    "policies": ["香港节点", "美国节点", "All"]
+  },
+  "Instagram": {
+    "aliases": ["instagram", "ig"],
+    "group": "Instagram",
+    "rules": ["Instagram/Instagram.list"],
+    "policies": ["香港节点", "美国节点", "日本节点", "All"]
+  },
+  "Facebook": {
+    "aliases": ["facebook", "fb"],
+    "group": "Facebook",
+    "rules": ["Facebook/Facebook.list"],
+    "policies": ["香港节点", "美国节点", "All"]
+  },
+  "Spotify": {
+    "aliases": ["spotify"],
+    "group": "Spotify",
+    "rules": ["Spotify/Spotify.list"],
+    "policies": ["香港节点", "美国节点", "新加坡节点", "All"]
+  },
+  "TikTok": {
+    "aliases": ["tiktok"],
+    "group": "TikTok",
+    "rules": ["TikTok/TikTok.list"],
+    "policies": ["美国节点", "日本节点", "台湾节点", "All"]
+  },
+  "Discord": {
+    "aliases": ["discord"],
+    "group": "Discord",
+    "rules": ["Discord/Discord.list"],
+    "policies": ["美国节点", "日本节点", "新加坡节点", "香港节点", "All"]
+  },
+  "Reddit": {
+    "aliases": ["reddit"],
+    "group": "Reddit",
+    "rules": ["Reddit/Reddit.list"],
+    "policies": ["美国节点", "日本节点", "新加坡节点", "香港节点", "All"]
+  },
+  "Microsoft": {
+    "aliases": ["microsoft", "ms"],
+    "group": "微软服务",
+    "rules": ["Microsoft/Microsoft.list"],
+    "policies": ["DIRECT", "香港节点", "美国节点", "All"]
+  },
+  "OneDrive": {
+    "aliases": ["onedrive"],
+    "group": "微软服务",
+    "rules": ["OneDrive/OneDrive.list"],
+    "policies": ["DIRECT", "香港节点", "美国节点", "All"]
+  }
+}

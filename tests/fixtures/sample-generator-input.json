@@ -1,0 +1,10 @@
+{
+  "subscriptions": [
+    {
+      "name": "机场A",
+      "url": "https://example.com/sub?token=token-a"
+    }
+  ],
+  "services": ["Telegram", "YouTube", "ChatGPT", "GitHub"],
+  "adBlock": true
+}
