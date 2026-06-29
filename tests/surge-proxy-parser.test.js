@@ -75,3 +75,95 @@ test('parser loads and parses an HTTP subscription URL', async () => {
     global.fetch = originalFetch;
   }
 });
+
+test('parser uses a generic user-agent so airports return node lists instead of managed configs', async () => {
+  const originalFetch = global.fetch;
+  const capturedHeaders = [];
+  global.fetch = async (url, options = {}) => {
+    capturedHeaders.push(options.headers || {});
+    return {
+      ok: true,
+      status: 200,
+      text: async () => 'trojan://secret@hk.example.com:443#HK-01\n'
+    };
+  };
+
+  try {
+    await loadProxySource({ address: 'https://example.com/sub' });
+    const ua = capturedHeaders[0]['user-agent'] || '';
+    // 不能用 surge-tuner 或 surge 之类的 UA，否则机场会返回 #!MANAGED-CONFIG 托管配置头
+    assert.ok(!/surge/i.test(ua), `UA 不应包含 surge，实际: ${ua}`);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('parser reports a friendly error when airport returns a Surge managed-config header', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    text: async () => '#!MANAGED-CONFIG https://example.com/api/v1/client/subscribe?token=xxx\n[General]\nipv6 = false\n'
+  });
+
+  try {
+    await assert.rejects(
+      loadProxySource({ address: 'https://example.com/sub' }),
+      /MANAGED-CONFIG|托管配置|节点列表/
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('parser loads multiple addresses from address array', async () => {
+  const proxies = await loadProxySource({
+    addresses: [
+      'trojan://secret@hk.example.com:443?sni=hk.example.com#香港-HK-01',
+      'trojan://secret@us.example.com:443?sni=us.example.com#美国-US-01'
+    ]
+  });
+
+  assert.equal(proxies.length, 2);
+  assert.equal(proxies[0].name, '香港-HK-01');
+  assert.equal(proxies[1].name, '美国-US-01');
+});
+
+test('parser loads multiple addresses from multiline address text', async () => {
+  const proxies = await loadProxySource({
+    address: [
+      'trojan://secret@hk.example.com:443?sni=hk.example.com#香港-HK-01',
+      'trojan://secret@us.example.com:443?sni=us.example.com#美国-US-01'
+    ].join('\n')
+  });
+
+  assert.equal(proxies.length, 2);
+});
+
+test('parser decodes URL-encoded subscription content from airports that percent-encode the whole body', () => {
+  // 部分机场订阅会把整段节点列表做 URL-encode，导致 `trojan://` 变成 `trojan%3A%2F%2F`，
+  // 节点名里的中文也是 %XX 转义。解析器必须能识别这种格式。
+  const raw = [
+    'trojan%3A%2F%2Fsecret%40hk.example.com%3A443%3Fsni%3Dhk.example.com%23%E9%A6%99%E6%B8%AF-HK-01',
+    'trojan%3A%2F%2Fsecret%40us.example.com%3A443%3Fsni%3Dus.example.com%23%E7%BE%8E%E5%9B%BD-US-01'
+  ].join('%0A');
+  const proxies = parseProxyContent(raw);
+
+  assert.equal(proxies.length, 2);
+  assert.equal(proxies[0].name, '香港-HK-01');
+  assert.equal(proxies[0].host, 'hk.example.com');
+  assert.equal(proxies[0].port, 443);
+  assert.equal(proxies[1].name, '美国-US-01');
+});
+
+test('parser decodes URL-encoded content with CRLF separators (%0D%0A)', () => {
+  const raw = [
+    'trojan%3A%2F%2Fsecret%40hk.example.com%3A443%23HK-01',
+    'trojan%3A%2F%2Fsecret%40us.example.com%3A443%23US-01'
+  ].join('%0D%0A');
+  const proxies = parseProxyContent(raw);
+
+  assert.equal(proxies.length, 2);
+  assert.equal(proxies[0].name, 'HK-01');
+  assert.equal(proxies[1].name, 'US-01');
+});

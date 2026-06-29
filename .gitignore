@@ -19,6 +19,7 @@ configs/generated/
 # AI 会话数据
 .reasonix/
 reasonix.toml
+.cache/
 
 # 运行时生成的文件
 kelee/list.json

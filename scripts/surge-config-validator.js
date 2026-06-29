@@ -271,16 +271,30 @@ function validateProxyGroup(entry, issues, policyNames) {
 
   for (const policy of parts.slice(1)) {
     if (!isProxyGroupPolicyReference(policy)) continue;
-    if (!policyNames.has(policy)) {
+    // 策略引用可能用引号包裹（如 "♻️ 自动选择"），比较时去掉外层引号。
+    const normalized = stripQuotes(policy);
+    if (!policyNames.has(normalized)) {
       addIssue(
         issues,
         'error',
         'GROUP_POLICY_UNDEFINED',
-        `Proxy group "${assignment.name}" references undefined policy or proxy "${policy}".`,
+        `Proxy group "${assignment.name}" references undefined policy or proxy "${normalized}".`,
         entry.number
       );
     }
   }
+}
+
+function stripQuotes(value) {
+  const item = String(value || '').trim();
+  if (item.length >= 2) {
+    const first = item[0];
+    const last = item[item.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return item.slice(1, -1).trim();
+    }
+  }
+  return item;
 }
 
 function isProxyGroupPolicyReference(value) {
@@ -348,12 +362,14 @@ function validatePolicy(policy, policyNames, issues, line) {
     addIssue(issues, 'error', 'RULE_POLICY_MISSING', 'Rule is missing a policy target.', line);
     return;
   }
-  if (!policyNames.has(policy)) {
+  // 策略名可能用引号包裹（如 RULE-SET,url,"♻️ 自动选择"），比较时去掉外层引号。
+  const normalized = stripQuotes(policy);
+  if (!policyNames.has(normalized)) {
     addIssue(
       issues,
       'error',
       'RULE_POLICY_UNDEFINED',
-      `Rule targets undefined policy "${policy}".`,
+      `Rule targets undefined policy "${normalized}".`,
       line
     );
   }

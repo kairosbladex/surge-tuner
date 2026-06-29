@@ -149,7 +149,9 @@ function createA2AServer(options = {}) {
         const result = await createTaskFromSendMessageRequest(body, taskStore, skillRouter, {
           allowLocalFiles,
           preferenceStore,
-          baseUrl: getPublicBaseUrl(req, options)
+          baseUrl: getPublicBaseUrl(req, options),
+          fetchImpl: options.fetchImpl,
+          ruleDiscoveryCachePath: options.ruleDiscoveryCachePath
         });
         return sendJson(res, 200, result);
       }
@@ -168,7 +170,9 @@ function createA2AServer(options = {}) {
           const result = await createTaskFromSendMessageRequest(body, taskStore, skillRouter, {
             allowLocalFiles,
             preferenceStore,
-            baseUrl: getPublicBaseUrl(req, options)
+            baseUrl: getPublicBaseUrl(req, options),
+            fetchImpl: options.fetchImpl,
+            ruleDiscoveryCachePath: options.ruleDiscoveryCachePath
           });
 
           // Stream the task updates

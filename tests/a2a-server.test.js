@@ -1,12 +1,15 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const test = require('node:test');
 
 const { createA2AServer } = require('../scripts/a2a-server');
 
-async function withServer(fn) {
-  const server = createA2AServer();
+async function withServer(fn, options = {}) {
+  const server = createA2AServer(options);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   const baseUrl = `http://127.0.0.1:${address.port}`;
@@ -386,5 +389,79 @@ test('A2A local file inputs are rejected by default', async () => {
     assert.equal(configPath.response.status, 200);
     assert.equal(configPath.body.task.status.state, 'TASK_STATE_FAILED');
     assert.match(configPath.body.task.status.message.parts[0].text, /A2A_ALLOW_LOCAL_FILES=1/);
+  });
+});
+
+test('A2A generation accepts addresses array, common preset, and returns platform adblock artifacts', async () => {
+  await withServer(async (baseUrl) => {
+    const cases = [
+      ['surge', 'surge-adblock-module', /GitHub = select/],
+      ['loon', 'loon-adblock-config', /GitHub = select/],
+      ['quantumultx', 'quantumultx-adblock-snippet', /static=GitHub/],
+      ['clash', 'clash-adblock-rule-providers', /name: GitHub/]
+    ];
+
+    for (const [platform, adblockArtifactId, contentPattern] of cases) {
+      const { response, body } = await postA2A(baseUrl, {
+        addresses: [
+          'trojan://secret@hk.example.com:443?sni=hk.example.com#香港-HK-01',
+          'trojan://secret@us.example.com:443?sni=us.example.com#美国-US-01'
+        ],
+        preset: 'common',
+        platform,
+        adBlock: true
+      });
+
+      assert.equal(response.status, 200);
+      assert.equal(body.task.status.state, 'TASK_STATE_COMPLETED');
+      assert.match(body.task.artifacts[0].parts[0].text, contentPattern);
+      assert.ok(body.task.artifacts.some((artifact) => artifact.artifactId === adblockArtifactId));
+      assert.ok(body.task.artifacts.some((artifact) => artifact.artifactId === 'adblock-import-guide'));
+    }
+  });
+});
+
+test('A2A discoverRules discovers missing service through injected GitHub lookup', async () => {
+  await withServer(async (baseUrl) => {
+    const { response, body } = await postA2A(baseUrl, {
+      address: 'trojan://secret@hk.example.com:443?sni=hk.example.com#香港-HK-01',
+      services: ['Notion'],
+      platform: 'surge',
+      discoverRules: true,
+      adBlock: false
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(body.task.status.state, 'TASK_STATE_COMPLETED');
+    assert.match(body.task.artifacts[0].parts[0].text, /RULE-SET,https:\/\/raw\.githubusercontent\.com\/blackmatrix7\/ios_rule_script\/master\/rule\/Surge\/Notion\/Notion\.list,Notion/);
+    assert.equal(body.task.artifacts[1].parts[0].data.discoveries[0].name, 'Notion');
+  }, {
+    ruleDiscoveryCachePath: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-tuner-a2a-discovery-')), 'cache.json'),
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { type: 'file', name: 'Notion.list', html_url: 'https://github.com/blackmatrix7/ios_rule_script/tree/master/rule/Surge/Notion/Notion.list' }
+      ]
+    })
+  });
+});
+
+test('A2A discoverRules failure returns actionable failed task', async () => {
+  await withServer(async (baseUrl) => {
+    const { response, body } = await postA2A(baseUrl, {
+      address: 'trojan://secret@hk.example.com:443?sni=hk.example.com#香港-HK-01',
+      services: ['MissingApp'],
+      platform: 'surge',
+      discoverRules: true,
+      adBlock: false
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(body.task.status.state, 'TASK_STATE_FAILED');
+    assert.match(body.task.status.message.parts[0].text, /Unknown service "MissingApp"/);
+  }, {
+    ruleDiscoveryCachePath: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-tuner-a2a-discovery-')), 'cache.json'),
+    fetchImpl: async () => ({ ok: false, status: 404 })
   });
 });

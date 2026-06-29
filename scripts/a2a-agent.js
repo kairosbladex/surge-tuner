@@ -23,6 +23,9 @@ const { generateSurgeModule, generateLoonAdblockConfig, generateClashRuleProvide
 const { UserPreferenceStore } = require('./user-preference-store');
 const { loadProxySource } = require('./surge-proxy-parser');
 const { TASK_STATE, TaskStore, SkillRouter } = require('./a2a-task-manager');
+const { applyServicePreset } = require('./generator-common');
+const { prepareCatalogForServices } = require('./rule-discovery');
+const { createAdblockArtifact, createAdblockInstructionArtifact } = require('./adblock-artifacts');
 
 const PROTOCOL_VERSION = '1.0';
 const DEFAULT_PROFILE_NAME = 'proxy-profile.conf';
@@ -70,7 +73,7 @@ function buildAgentCard(baseUrl) {
         description: 'Create a validated Surge for iOS profile from proxy subscriptions, single proxy URIs, parsed proxy objects, services, custom rules, and optional ad blocking.',
         tags: ['surge', 'proxy', 'configuration', 'adblock', 'ios'],
         examples: [
-          '{"address":"trojan://secret@example.com:443?sni=example.com#US-01","services":["Telegram","ChatGPT"],"adBlock":true}',
+          '{"addresses":["trojan://secret@example.com:443?sni=example.com#US-01"],"preset":"common","adBlock":true}',
           '{"subscriptions":[{"name":"AirportA","url":"https://example.com/sub?token=***"}],"services":["Telegram","YouTube"]}'
         ],
         inputModes: ['application/json', 'text/plain'],
@@ -172,17 +175,24 @@ function registerSkills(router, taskStore, preferenceStore) {
 
     taskStore.addProgress(task.id, 'Parsing proxy source...');
     const proxies = await maybeLoadProxies(input, options);
-    const genInput = {
+    const genInput = applyServicePreset({
       subscriptions: input.subscriptions || pref.subscriptions || [],
       proxies: proxies || input.proxies || [],
       services: input.services || pref.commonServices || [],
       adBlock: input.adBlock ?? (pref.adBlockLevel !== 'none'),
       finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流',
-      rules: input.rules || []
-    };
+      rules: input.rules || [],
+      preset: input.preset
+    });
 
     taskStore.addProgress(task.id, `Generating Surge config (${(genInput.proxies || []).length} proxies)...`);
-    const config = generateSurgeConfig(genInput, options);
+    const catalogResult = await prepareCatalogForServices(genInput.services, {
+      discoverRules: Boolean(input.discoverRules),
+      platform: 'surge',
+      fetchImpl: options.fetchImpl,
+      cachePath: options.ruleDiscoveryCachePath
+    });
+    const config = generateSurgeConfig(genInput, { ...options, catalog: catalogResult.catalog });
 
     const profileName = input.profileName || DEFAULT_PROFILE_NAME;
     taskStore.addProgress(task.id, 'Validating generated config...');
@@ -214,12 +224,13 @@ function registerSkills(router, taskStore, preferenceStore) {
               platform: 'surge',
               profileName,
               warnings,
+              discoveries: catalogResult.discovered,
               inputSummary: summarizeInput(genInput),
               outputBytes: Buffer.byteLength(config, 'utf8')
             }
           }]
         }
-      ]
+      ].concat(adblockArtifactsForA2A('surge', genInput, input))
     };
   });
 
@@ -230,17 +241,24 @@ function registerSkills(router, taskStore, preferenceStore) {
 
     taskStore.addProgress(task.id, 'Parsing proxy source...');
     const proxies = await maybeLoadProxies(input, options);
-    const genInput = {
+    const genInput = applyServicePreset({
       subscriptions: input.subscriptions || pref.subscriptions || [],
       proxies: proxies || input.proxies || [],
       services: input.services || pref.commonServices || [],
       adBlock: input.adBlock ?? (pref.adBlockLevel !== 'none'),
       finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流',
-      rules: input.rules || []
-    };
+      rules: input.rules || [],
+      preset: input.preset
+    });
 
     taskStore.addProgress(task.id, 'Generating Loon config...');
-    const config = generateLoonConfig(genInput, options);
+    const catalogResult = await prepareCatalogForServices(genInput.services, {
+      discoverRules: Boolean(input.discoverRules),
+      platform: 'loon',
+      fetchImpl: options.fetchImpl,
+      cachePath: options.ruleDiscoveryCachePath
+    });
+    const config = generateLoonConfig(genInput, { ...options, catalog: catalogResult.catalog });
     const profileName = input.profileName || 'loon-profile.conf';
 
     return {
@@ -256,9 +274,9 @@ function registerSkills(router, taskStore, preferenceStore) {
         {
           artifactId: 'generation-result',
           name: 'generation-result.json',
-          parts: [{ data: { ok: true, platform: 'loon', profileName, outputBytes: Buffer.byteLength(config, 'utf8') } }]
+          parts: [{ data: { ok: true, platform: 'loon', profileName, discoveries: catalogResult.discovered, outputBytes: Buffer.byteLength(config, 'utf8') } }]
         }
-      ]
+      ].concat(adblockArtifactsForA2A('loon', genInput, input))
     };
   });
 
@@ -269,16 +287,23 @@ function registerSkills(router, taskStore, preferenceStore) {
 
     taskStore.addProgress(task.id, 'Parsing proxy source...');
     const proxies = await maybeLoadProxies(input, options);
-    const genInput = {
+    const genInput = applyServicePreset({
       subscriptions: input.subscriptions || pref.subscriptions || [],
       proxies: proxies || input.proxies || [],
       services: input.services || pref.commonServices || [],
       adBlock: input.adBlock ?? (pref.adBlockLevel !== 'none'),
-      finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流'
-    };
+      finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流',
+      preset: input.preset
+    });
 
     taskStore.addProgress(task.id, 'Generating Quantumult X config...');
-    const config = generateQuantumultXConfig(genInput, options);
+    const catalogResult = await prepareCatalogForServices(genInput.services, {
+      discoverRules: Boolean(input.discoverRules),
+      platform: 'quantumultx',
+      fetchImpl: options.fetchImpl,
+      cachePath: options.ruleDiscoveryCachePath
+    });
+    const config = generateQuantumultXConfig(genInput, { ...options, catalog: catalogResult.catalog });
     const profileName = input.profileName || 'qx-profile.conf';
 
     return {
@@ -294,9 +319,9 @@ function registerSkills(router, taskStore, preferenceStore) {
         {
           artifactId: 'generation-result',
           name: 'generation-result.json',
-          parts: [{ data: { ok: true, platform: 'quantumultx', profileName, outputBytes: Buffer.byteLength(config, 'utf8') } }]
+          parts: [{ data: { ok: true, platform: 'quantumultx', profileName, discoveries: catalogResult.discovered, outputBytes: Buffer.byteLength(config, 'utf8') } }]
         }
-      ]
+      ].concat(adblockArtifactsForA2A('quantumultx', genInput, input))
     };
   });
 
@@ -307,16 +332,23 @@ function registerSkills(router, taskStore, preferenceStore) {
 
     taskStore.addProgress(task.id, 'Parsing proxy source...');
     const proxies = await maybeLoadProxies(input, options);
-    const genInput = {
+    const genInput = applyServicePreset({
       subscriptions: input.subscriptions || pref.subscriptions || [],
       proxies: proxies || input.proxies || [],
       services: input.services || pref.commonServices || [],
       adBlock: input.adBlock ?? (pref.adBlockLevel !== 'none'),
-      finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流'
-    };
+      finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流',
+      preset: input.preset
+    });
 
     taskStore.addProgress(task.id, 'Generating Clash YAML config...');
-    const config = generateClashConfig(genInput, options);
+    const catalogResult = await prepareCatalogForServices(genInput.services, {
+      discoverRules: Boolean(input.discoverRules),
+      platform: 'clash',
+      fetchImpl: options.fetchImpl,
+      cachePath: options.ruleDiscoveryCachePath
+    });
+    const config = generateClashConfig(genInput, { ...options, catalog: catalogResult.catalog });
     const profileName = input.profileName || 'clash-profile.yaml';
 
     return {
@@ -332,9 +364,9 @@ function registerSkills(router, taskStore, preferenceStore) {
         {
           artifactId: 'generation-result',
           name: 'generation-result.json',
-          parts: [{ data: { ok: true, platform: 'clash', profileName, outputBytes: Buffer.byteLength(config, 'utf8') } }]
+          parts: [{ data: { ok: true, platform: 'clash', profileName, discoveries: catalogResult.discovered, outputBytes: Buffer.byteLength(config, 'utf8') } }]
         }
-      ]
+      ].concat(adblockArtifactsForA2A('clash', genInput, input))
     };
   });
 
@@ -504,8 +536,8 @@ function registerSkills(router, taskStore, preferenceStore) {
 
   // Parse Proxies
   router.register('parse-proxies', async (task, input, options) => {
-    if (!input.address && !input.addressFile) {
-      throw new Error('address or addressFile is required');
+    if (!input.address && !input.addressFile && !input.addresses) {
+      throw new Error('address, addresses, or addressFile is required');
     }
     if (input.addressFile && !options.allowLocalFiles) {
       throw new Error('addressFile requires A2A_ALLOW_LOCAL_FILES=1');
@@ -514,6 +546,7 @@ function registerSkills(router, taskStore, preferenceStore) {
     taskStore.addProgress(task.id, 'Parsing proxy source...');
     const proxies = await loadProxySource({
       address: input.address,
+      addresses: input.addresses,
       addressFile: input.addressFile || null
     });
 
@@ -657,7 +690,7 @@ function determineSkill(input) {
   }
 
   // If only parsing is requested
-  if (input.address && !input.services && !input.subscriptions) {
+  if ((input.address || input.addresses) && !input.services && !input.subscriptions && !input.preset) {
     return 'parse-proxies';
   }
 
@@ -725,16 +758,42 @@ function looksLikeProxySource(value) {
 
 async function maybeLoadProxies(input, options) {
   if (input.proxies) return null; // Already have proxies
-  if (input.address || input.addressFile) {
+  if (input.address || input.addresses || input.addressFile) {
     if (input.addressFile && !options.allowLocalFiles) {
       throw new Error('addressFile requires A2A_ALLOW_LOCAL_FILES=1');
     }
     return loadProxySource({
       address: input.address,
+      addresses: input.addresses,
       addressFile: input.addressFile || null
     });
   }
   return null;
+}
+
+function adblockArtifactsForA2A(platform, genInput, input) {
+  if (!genInput.adBlock) return [];
+  const artifact = createAdblockArtifact(platform, {
+    customDomains: input.customDomains,
+    useOnlineRules: input.useOnlineRules,
+    onlineSources: input.onlineSources,
+    outputName: input.adblockOutputName
+  });
+  const guide = createAdblockInstructionArtifact(platform);
+  return [
+    {
+      artifactId: artifact.artifactId,
+      name: artifact.name,
+      description: artifact.description,
+      parts: [{ text: artifact.text, metadata: { filename: artifact.name, mimeType: artifact.mimeType } }]
+    },
+    {
+      artifactId: guide.artifactId,
+      name: guide.name,
+      description: guide.description,
+      parts: [{ text: guide.text, metadata: { filename: guide.name, mimeType: guide.mimeType } }]
+    }
+  ];
 }
 
 function summarizeInput(input) {

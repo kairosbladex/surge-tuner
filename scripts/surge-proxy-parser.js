@@ -8,7 +8,7 @@ const SUPPORTED_SCHEMES = ['ss://', 'trojan://', 'vmess://', 'hy2://', 'hysteria
 function parseProxyAddress(address) {
   const value = String(address || '').trim();
   if (!value) {
-    throw new Error('proxy address is empty');
+    throw new Error('代理地址为空');
   }
 
   if (value.startsWith('ss://')) return parseShadowsocks(value);
@@ -17,12 +17,18 @@ function parseProxyAddress(address) {
   if (value.startsWith('hy2://') || value.startsWith('hysteria2://')) return parseHysteria2(value);
   if (value.startsWith('tuic://')) return parseTuic(value);
 
-  throw new Error(`unsupported proxy scheme: ${value.slice(0, 16)}`);
+  throw new Error(`不支持的代理协议: ${value.slice(0, 16)}`);
 }
 
 function parseProxyContent(content) {
   const normalized = normalizeSubscriptionContent(content);
   const entries = [];
+
+  // Surge 托管配置头：机场识别到 Surge 类 UA 时会返回 #!MANAGED-CONFIG 而不是节点列表，
+  // 这里给出更明确的错误，避免和"未找到支持的代理地址"混淆。
+  if (/^\s*#!MANAGED-CONFIG/i.test(normalized)) {
+    throw new Error('订阅返回的是 Surge 托管配置（#!MANAGED-CONFIG），不是节点列表。请检查订阅是否需要换 User-Agent 或使用节点订阅链接。');
+  }
 
   for (const rawLine of normalized.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -32,36 +38,61 @@ function parseProxyContent(content) {
   }
 
   if (entries.length === 0) {
-    throw new Error('no supported proxy addresses found');
+    throw new Error('未找到支持的代理地址。支持的协议: ss:// trojan:// vmess:// hy2:// hysteria2:// tuic://');
   }
 
   return dedupeProxyNames(entries);
 }
 
-async function loadProxySource(options) {
+async function loadProxySource(options = {}) {
+  const entries = [];
+
   if (options.addressFile) {
-    return parseProxyContent(fs.readFileSync(options.addressFile, 'utf8'));
+    entries.push(...parseProxyContent(fs.readFileSync(options.addressFile, 'utf8')));
   }
 
-  if (!options.address) {
-    throw new Error('address or addressFile is required');
+  const addresses = Array.isArray(options.addresses) ? options.addresses : [];
+  for (const address of addresses) {
+    entries.push(...await loadAddressText(address));
   }
 
-  const address = String(options.address).trim();
+  if (options.address) {
+    entries.push(...await loadAddressText(options.address));
+  }
+
+  if (entries.length > 0) {
+    return dedupeProxyNames(entries);
+  }
+
+  if (!options.address && !options.addressFile && addresses.length === 0) {
+    throw new Error('需要提供代理地址或地址文件');
+  }
+
+  throw new Error('未找到支持的代理地址');
+}
+
+async function loadAddressText(value) {
+  const address = String(value || '').trim();
+  if (!address) return [];
+  if (/\r?\n/.test(address)) {
+    return parseProxyContent(address);
+  }
   if (/^https?:\/\//i.test(address)) {
     const response = await fetch(address, {
       headers: {
-        'user-agent': 'surge-tuner/0.1'
+        // 不能用 surge 类 UA，否则机场会返回 #!MANAGED-CONFIG 托管配置头而不是节点列表。
+        // 用通用的 v2rayN UA，机场会返回 Base64/明文节点列表，可被解析器识别。
+        'user-agent': 'v2rayN/6.0'
       }
     });
     if (!response.ok) {
-      throw new Error(`failed to fetch subscription: HTTP ${response.status}`);
+      throw new Error(`订阅地址获取失败: HTTP ${response.status}`);
     }
     return parseProxyContent(await response.text());
   }
 
   if (SUPPORTED_SCHEMES.some((scheme) => address.startsWith(scheme))) {
-    return dedupeProxyNames([parseProxyAddress(address)]);
+    return [parseProxyAddress(address)];
   }
 
   return parseProxyContent(address);
@@ -86,7 +117,7 @@ function parseShadowsocks(uri) {
     const decoded = decodeBase64(main);
     const atIndex = decoded.lastIndexOf('@');
     if (atIndex < 0) {
-      throw new Error('invalid shadowsocks URI: missing server');
+      throw new Error('Shadowsocks URI 无效: 缺少服务器地址');
     }
     userInfo = decoded.slice(0, atIndex);
     serverPart = decoded.slice(atIndex + 1);
@@ -94,7 +125,7 @@ function parseShadowsocks(uri) {
 
   const colonIndex = userInfo.indexOf(':');
   if (colonIndex < 1) {
-    throw new Error('invalid shadowsocks URI: missing method/password');
+    throw new Error('Shadowsocks URI 无效: 缺少加密方法/密码');
   }
 
   const method = userInfo.slice(0, colonIndex);
@@ -208,7 +239,18 @@ function normalizeSubscriptionContent(content) {
       return decoded;
     }
   } catch (_) {
-    // Keep original text; the caller reports if no proxy address is found.
+    // 不是 Base64，继续尝试其他解码。
+  }
+
+  // 部分机场会把整段节点列表做 URL-encode（`trojan://` 变成 `trojan%3A%2F%2F`），
+  // 需要先 percent-decode 才能识别协议头。
+  try {
+    const decoded = decodeURIComponent(text);
+    if (SUPPORTED_SCHEMES.some((scheme) => decoded.includes(scheme))) {
+      return decoded;
+    }
+  } catch (_) {
+    // 包含非法 %XX 序列，按原始文本处理。
   }
   return text;
 }

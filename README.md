@@ -1,366 +1,400 @@
-# Proxy Tuner — Agent-to-Agent 代理配置自动生成 & 去广告工具包
+# Proxy Tuner — 帮你生成自己的手机代理配置文件
 
-> 🤖 **A2A (Agent-to-Agent) 智能代理 — 根据 VPN 地址自动解析节点、生成多平台路由规则、安装去广告插件、记忆用户偏好**
+## 这是什么
 
----
+Proxy Tuner 是一个本地小工具。你把服务商后台给你的订阅链接或节点链接粘进去，它会帮你生成 Surge、Loon、Quantumult X、Clash/Stash 可以导入的配置文件。
 
-## 🌟 项目愿景
+你不用先学配置语法，也不用手写规则。先按下面的步骤跑通一次：打开浏览器页面，粘贴链接，选择你手机上用的 App，点击生成，把文件发到手机，在 App 里导入。
 
-**Proxy Tuner** 是一个 **纯 AI Agent 驱动的 A2A（Agent-to-Agent）配置生成器**，致力于解决代理配置中的三大痛点：
+你的真实链接只在你自己的电脑上处理。不要把订阅链接、节点链接、生成后的配置文件发到微信群、公开仓库、截图或论坛里。
 
-1. **配置繁琐** — 机场订阅节点多，手动分不清地区，策略组配到手软
-2. **广告困扰** — 去广告规则分散，集成困难
-3. **跨平台隔离** — Surge/Loon/QX/Clash 配置互不兼容，切换成本高
+## 零依赖快速开始
 
-我们通过 **A2A 协议** 和 **8 个 Skill**，让 AI Agent 帮你完成所有工作。
+你需要一台电脑和 Node >= 20。还没有 Node？从 [nodejs.org](https://nodejs.org) 下载安装 LTS 版本即可。还没有 Git？Mac 用户首次运行 `git clone` 时会自动提示安装；Windows 用户请从 [git-scm.com](https://git-scm.com) 下载。
 
-### 核心能力矩阵
+打开终端，按你的系统选择下面的方式启动：
 
-| 能力 | 说明 | 对应 A2A Skill |
-|------|------|---------------|
-| 🔗 **订阅解析** | 自动拉取机场订阅，识别每个节点的协议、地区、线路类型 | `parse-proxies` |
-| 🌍 **节点分类** | 通过节点名称中的 Emoji/中文/英文，自动分配到对应地区组 | 所有 generate-* |
-| 🧠 **智能策略** | 为每个服务推荐最优策略类型（URL-Test/Smart/Select） | 所有 generate-* |
-| 📋 **跨平台生成** | 生成 Surge/Loon/QX/Clash 四平台配置 | `generate-*-profile` |
-| 🔄 **跨平台转换** | Surge ↔ Loon ↔ Quantumult X ↔ Clash 配置互转 | `convert-config` |
-| 🛡️ **去广告集成** | 自动生成去广告模块，集成 kelee.one + anti-ad + 自定义域名 | `install-adblock` |
-| 💾 **用户偏好** | 记住用户的平台偏好、常用服务、自定义规则 | `manage-preferences` |
-| ✅ **自动校验** | 生成后自动校验配置合法性，拒绝输出有 error 的配置 | 内置 |
-
----
-
-## 🚀 快速开始
-
-### 方式一：A2A Remote Agent（推荐 — 给其他 Agent 调用）
-
-启动 A2A HTTP+JSON 服务，暴露 8 个 Skill 供其他 Agent 自动发现和调用；`message:stream` 和 `tasks/{id}:subscribe` 提供本地 SSE 事件流：
+**Mac / Linux**（终端）：
 
 ```bash
-npm run start:a2a
+git clone https://github.com/kairosbladex/surge-tuner.git
+cd surge-tuner
+./quick-start.sh
 ```
 
-默认地址：`http://127.0.0.1:8787`
+如果提示 `Permission denied`，先运行 `chmod +x quick-start.sh` 再试。
+
+**Windows**（PowerShell）：
+
+```powershell
+git clone https://github.com/kairosbladex/surge-tuner.git
+cd surge-tuner
+npm run quick-start
+```
+
+运行后会自动打开浏览器页面：
+
+```text
+http://127.0.0.1:8788
+```
+
+如果浏览器没有自动打开，就把上面这行地址复制到浏览器地址栏。
+
+## 你需要准备什么
+
+| 需要准备 | 从哪里来 |
+|----------|----------|
+| 一台电脑 | Mac、Windows、Linux 都可以，只要能运行 Node >= 20 |
+| 一个订阅链接或节点链接 | 通常在你的服务商后台，常见名字是“订阅地址”“一键导入”“复制节点” |
+| 一个手机 App | Surge、Loon、Quantumult X、Stash 或其他 Clash 类 App |
+| 一点耐心 | 第一次照着步骤做，先保证能导入和连通 |
+
+订阅链接通常长这样：
+
+```text
+https://example.com/sub?token=这里是你的私密内容
+```
+
+节点链接通常以这些开头：
+
+```text
+ss://...
+trojan://...
+vmess://...
+hy2://...
+tuic://...
+```
+
+上面只是格式示例，不能直接拿来用。请使用你自己服务商后台提供的真实链接。
+
+## 电脑小白怎么操作
+
+### 第一步：打开终端
+
+Mac 用户可以打开“终端”。Windows 用户可以打开 PowerShell 或命令提示符。
+
+### 第二步：启动生成页面
+
+如果你还没有下载项目，就按”零依赖快速开始”的指引操作。已经进入项目目录的话：
+
+**Mac / Linux** 运行：
 
 ```bash
-# 发现能力
-curl -H 'A2A-Version: 1.0' http://127.0.0.1:8787/.well-known/agent-card.json
-
-# 生成 Surge 配置
-curl -sS -X POST http://127.0.0.1:8787/message:send \
-  -H 'content-type: application/a2a+json' \
-  -H 'A2A-Version: 1.0' \
-  --data '{
-    "message": {
-      "parts": [{
-        "data": {
-          "address": "trojan://secret@example.com:443?sni=example.com#US-01",
-          "services": ["Telegram", "ChatGPT"],
-          "adBlock": true
-        }
-      }]
-    }
-  }'
-
-# SSE 事件流生成
-curl -sS -N -X POST http://127.0.0.1:8787/message:stream \
-  -H 'content-type: application/a2a+json' \
-  -H 'A2A-Version: 1.0' \
-  --data '{"message":{"parts":[{"data":{"address":"trojan://...","platform":"clash"}}]}}'
-
-# 查询任务
-curl -H 'A2A-Version: 1.0' http://127.0.0.1:8787/tasks/<task-id>
-
-# SSE 订阅任务状态
-curl -sS -N http://127.0.0.1:8787/tasks/<task-id>:subscribe
-
-# 取消任务
-curl -X POST http://127.0.0.1:8787/tasks/<task-id>:cancel \
-  -H 'A2A-Version: 1.0'
+./quick-start.sh
 ```
 
-所有端点说明详见 `docs/a2a.md`。
-
-### 方式二：交互式 Agent
-
-直接与 Agent 对话，输入你的需求：
-
-```
-"帮我根据这个订阅链接生成 Surge 配置：https://example.com/sub?token=xxx"
-"给我的节点按香港/日本/美国分类"
-"帮我集成去广告规则到现有配置"
-"把这份 Surge 配置转成 Loon 的"
-"帮我生成 Loon 和 Clash 两套配置"
-"记住我喜欢用 Clash，常用 Telegram 和 YouTube"
-```
-
-Agent 会自动调用对应的 A2A Skill，与你交互确认后生成配置。
-
-### 方式三：直接使用模板
-
-如果你已经熟悉配置，可以直接使用 `templates/` 目录下的模板：
-
-- `templates/surge-subscription-template.conf` — 订阅 + 智能分流模板（**推荐**）
-- `templates/base.conf` — 基础稳定版
-- `templates/surge-ios-base.conf` — iOS 省电版
-
-### 方式四：使用去广告模块（原有功能）
-
-将 `modules/` 下的 `.sgmodule` 文件放入 Surge 配置目录即可启用。
-
-### 方式五：可执行生成与校验（推荐给 Agent / 维护者）
-
-本仓库现在提供零依赖 Node 工具，把配置生成和风险检查从“只靠提示词”收敛为可验证的 Module：
+**Windows** 运行：
 
 ```bash
-npm run generate -- --input tests/fixtures/sample-generator-input.json --output configs/generated/sample.conf
-npm run generate -- --address "trojan://password@example.com:443?sni=example.com#美国-US-01" --services Telegram,ChatGPT --output configs/generated/from-address.conf
-npm run generate -- --address-file tests/fixtures/sample-subscription.txt --services Telegram,ChatGPT --adblock --output configs/generated/from-subscription.conf
-npm run check
-npm run validate
-npm test
+npm run quick-start
 ```
 
-- `scripts/surge-config-generator.js`：读取结构化 JSON，生成 Surge for iOS 配置
-- `scripts/surge-proxy-parser.js`：解析 `ss://`、`trojan://`、`vmess://`、`hy2://`/`hysteria2://`、`tuic://` 和 Base64/明文订阅
-- `scripts/surge-config-validator.js`：检查本地规则文件、脚本路径、策略组引用、非标准策略类型和模块高风险字段
-- `rules/services/service-catalog.json`：服务 → 规则集 → 策略组的结构化目录
+### 第三步：在浏览器里粘贴链接
 
-生成器默认会在写出前调用校验器；发现 error 会拒绝输出成品配置。需要把 warning 也当失败时加 `--strict`，只有排查生成器本身时才使用 `--skip-validate`。
+页面打开后，找到输入框，把你的订阅链接或节点链接粘进去。
 
-### 方式六：A2A Remote Agent（给其他 Agent 调用）
+多个链接时，一行一个。不要把多个链接挤在同一行。
 
-启动本地 A2A HTTP+JSON 服务，并启用本地 SSE 事件流：
+### 第四步：选择你手机上用的 App
+
+| 你手机上用的是 | 页面里选择 |
+|----------------|------------|
+| Surge | Surge |
+| Loon | Loon |
+| Quantumult X | Quantumult X |
+| Stash、Clash、Clash Verge | Clash |
+
+不确定选哪个，就看你手机上安装的 App 名字。
+
+### 第五步：点击生成
+
+点击页面上的生成按钮。成功后，页面右侧会显示文件路径。
+
+默认文件会放在：
+
+```text
+configs/generated/quick-start/
+```
+
+你只需要关注生成出来的主配置文件。去广告相关文件可以等代理能正常使用后再研究。
+
+## 手机小白怎么导入
+
+### 第一步：把文件发到手机
+
+常见方式：
+
+- Mac 到 iPhone：用 AirDrop。
+- Windows 到 iPhone：用 [LocalSend](https://localsend.org)（局域网，免账号）、iCloud Drive、网盘或数据线。
+- 发给自己：可以用微信文件传输助手临时传文件，但不要把真实配置转发给别人。
+- Android：可以用数据线、网盘、局域网传输或手机文件管理器。
+
+### 第二步：打开你的代理 App
+
+打开 Surge、Loon、Quantumult X 或 Stash。
+
+### 第三步：导入配置文件
+
+在 App 里找这些入口：
+
+- 导入配置
+- 从文件导入
+- 新建配置
+- Profiles
+- Config
+
+不同 App 叫法不一样，但意思都是“选择一个配置文件导入”。
+
+### 第四步：启动并测试
+
+导入后，回到 App 主界面，开启代理或连接开关。
+
+测试这些常用 App 或网站：
+
+- Telegram
+- YouTube
+- GitHub
+- ChatGPT
+
+能打开，说明主配置已经基本可用。
+
+## 四个平台分别怎么做
+
+### Surge
+
+你要导入的主文件一般是 `.conf` 文件，例如：
+
+```text
+surge.conf
+```
+
+操作顺序：
+
+1. 把 `.conf` 文件发到 iPhone、iPad 或 Mac。
+2. 打开 Surge。
+3. 进入配置列表。
+4. 选择从文件导入。
+5. 选中刚才生成的 `.conf` 文件。
+6. 回到主界面，开启 Surge。
+7. 打开 Telegram、YouTube、GitHub 或 ChatGPT 测试。
+
+如果你生成时勾选了去广告，可能还会看到 `.sgmodule` 文件。第一次使用建议先只导入主配置，确认能正常上网后，再按 [MITM 配置指南](docs/mitm-setup.md) 处理去广告。
+
+### Loon
+
+你要导入的主文件一般是 `.conf` 文件，例如：
+
+```text
+loon.conf
+```
+
+操作顺序：
+
+1. 把 `.conf` 文件发到手机。
+2. 打开 Loon。
+3. 找到配置或导入入口。
+4. 选择刚才生成的文件。
+5. 启动 Loon。
+6. 打开常用 App 测试。
+
+如果生成了额外的去广告文件，先放一边。主配置能用以后，再按 Loon 的插件导入方式处理。
+
+### Quantumult X
+
+你要导入的主文件一般是 `.conf` 文件，例如：
+
+```text
+quantumultx.conf
+```
+
+操作顺序：
+
+1. 先备份你原来 Quantumult X 里的配置。
+2. 把新生成的 `.conf` 文件发到手机。
+3. 打开 Quantumult X。
+4. 导入或替换配置。
+5. 启动后测试 Telegram、YouTube、GitHub 或 ChatGPT。
+
+Quantumult X 的设置项比较细。第一次建议只先导入主文件，不要急着合并去广告内容。
+
+### Clash / Stash
+
+你要导入的主文件一般是 `.yaml` 文件，例如：
+
+```text
+clash.yaml
+```
+
+操作顺序：
+
+1. 把 `.yaml` 文件发到手机或电脑。
+2. 打开 Stash、Clash Verge 或其他 Clash 类客户端。
+3. 找到配置导入入口。
+4. 选择刚才生成的 `.yaml` 文件。
+5. 启动配置。
+6. 打开常用 App 或网站测试。
+
+Clash/Stash 主要负责分流和连接。去广告效果和 Surge、Loon、Quantumult X 不完全一样，第一次先把连接跑通。
+
+## 常见问题
+
+### 不知道链接在哪里
+
+去你的服务商后台找这些入口：
+
+- 订阅地址
+- 一键导入
+- Clash 订阅
+- Surge 订阅
+- 复制节点
+- 节点列表
+
+如果后台提供了多个链接，优先复制“订阅地址”。如果只有单个节点，也可以复制节点链接。
+
+### 页面打不开
+
+先确认你已经在项目目录里运行了启动命令（Mac/Linux 运行 `./quick-start.sh`，Windows 运行 `npm run quick-start`）。
+
+再手动打开：
+
+```text
+http://127.0.0.1:8788
+```
+
+如果还是打不开，检查终端里有没有报错。
+
+### Node 版本不对
+
+先运行：
 
 ```bash
-npm run start:a2a
+node -v
 ```
 
-默认地址：`http://127.0.0.1:8787`
+如果版本低于 20，请升级 Node。升级后运行：
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/.well-known/agent-card.json` | GET | 发现 8 个 Agent Skill |
-| `/message:send` | POST | 提交生成/转换/去广告/偏好任务 |
-| `/message:stream` | POST | SSE 包装提交任务并返回状态事件 |
-| `/tasks/{id}` | GET | 查询任务结果 |
-| `/tasks/{id}:subscribe` | GET | SSE 订阅内存任务状态 |
-| `/tasks/{id}:cancel` | POST | 取消尚未终态的任务 |
-| `/tasks` | GET | 列出所有任务 |
-| `/healthz` | GET | 健康检查 |
-
-边界说明：
-
-- 任务存储在当前进程内存中，服务重启后不会保留历史任务。
-- 当前不提供 OAuth、Webhook 或外部 push notification；需要鉴权时应放在反向代理或上层 Agent 网关。
-- 远程调用默认不能读本机文件；`addressFile` 和 `configPath` 只有在 `A2A_ALLOW_LOCAL_FILES=1` 时可用。
-- `configs/user-preferences.json` 和 `reasonix.toml` 是本机运行态文件，已加入忽略列表，避免提交真实订阅或本机 Agent 权限配置。
-
-当前支持的 8 个 Skill：
-
-| Skill | 功能 |
-|-------|------|
-| `generate-surge-profile` | 生成 Surge 配置 |
-| `generate-loon-profile` | 生成 Loon 配置 |
-| `generate-quantumultx-profile` | 生成 Quantumult X 配置 |
-| `generate-clash-profile` | 生成 Clash YAML 配置 |
-| `convert-config` | Surge ↔ Loon ↔ QX ↔ Clash 转换 |
-| `install-adblock` | 安装去广告插件（自动生成模块/规则） |
-| `manage-preferences` | 管理用户偏好 |
-| `parse-proxies` | 解析代理节点 |
-
-详见 `docs/a2a.md`。
-
----
-
-## 📁 项目结构
-
-```
-surge-tuner/
-├── proxy-tuner.skill.md      # 🔥 主 Agent 技能文件（核心！）
-├── surge-tuner.skill.md      # 旧技能文件（向后兼容）
-├── configs/                  # 完整配置示例
-│   ├── full-adblock.conf     # 全量去广告配置
-│   ├── stable-only.conf      # 仅稳定性优化
-│   ├── user-original.conf    # 真实用户配置示例（含三机场+智能分流）
-│   ├── user-optimized.conf   # 优化后的用户配置
-│   └── user-optimized.conf.example # 优化版（脱敏）
-├── templates/                # 配置模板
-│   ├── surge-subscription-template.conf  # 🔥 订阅+智能分流模板
-│   ├── base.conf             # 通用稳定版
-│   └── surge-ios-base.conf   # iOS 专用版
-├── modules/                  # Surge 模块 (.sgmodule)
-│   ├── Anti-Splash-Ad.sgmodule     # 开屏广告拦截
-│   ├── Anti-InApp-Ad.sgmodule      # 应用内广告拦截
-│   ├── Anti-Tracking.sgmodule      # 隐私追踪拦截
-│   ├── Ad-Block-All.sgmodule       # 全能广告合辑
-│   └── Stable-Optimization.sgmodule # 稳定性优化
-├── scripts/                  # 🔥 Node.js 脚本（可执行 Module）
-│   ├── a2a-server.js         # A2A HTTP+JSON+SSE 服务（8 Skills）
-│   ├── a2a-agent.js          # A2A 多 Skill 路由 & 任务创建
-│   ├── a2a-task-manager.js   # 任务生命周期管理（SSE订阅/取消）
-│   ├── platform-base.js      # 跨平台配置生成公共逻辑
-│   ├── surge-config-generator.js # Surge 配置生成 CLI
-│   ├── loon-config-generator.js  # 🔥 Loon 配置生成 CLI
-│   ├── quantumultx-config-generator.js # 🔥 QX 配置生成 CLI
-│   ├── clash-config-generator.js  # 🔥 Clash YAML 配置生成 CLI
-│   ├── cross-platform-converter.js # 🔥 Surge↔Loon↔QX↔Clash 转换引擎
-│   ├── adblock-installer.js  # 🔥 去广告插件自动安装（全平台）
-│   ├── user-preference-store.js # 🔥 用户偏好持久化
-│   ├── surge-proxy-parser.js # 节点 URI / 订阅内容解析
-│   ├── surge-config-validator.js # 配置校验 CLI（导入前检查）
-│   ├── ad-block-all.js       # 全能广告拦截
-│   ├── anti-tracking.js      # 隐私追踪拦截
-│   └── ...                   # 更多脚本
-├── rulesets/                 # 规则集（广告域名列表）
-│   ├── AdDomains.list        # 广告域名
-│   ├── SplashAd.list         # 开屏广告
-│   ├── InAppAd.list          # 应用内广告
-│   ├── Tracking.list         # 追踪域名
-│   ├── ChinaApps.list        # 国内 App
-│   ├── Apple.list            # Apple 服务
-│   ├── ChinaIP.list          # 国内 IP
-│   └── LAN.list              # 局域网
-├── rules/                    # 🔥 规则注册表（Agent 核心参考）
-│   ├── services/README.md    # 服务→区域策略映射
-│   ├── services/service-catalog.json # 服务规则结构化目录
-│   ├── regions/detection-rules.md  # 节点区域检测规则
-│   └── protocols/protocols.md      # 代理协议解析规则
-├── kelee/                    # 🔥 kelee.one 去广告插件集成
-│   ├── fetch-plugins.sh      # 获取插件列表脚本
-│   └── list.json             # 插件目录缓存（运行 fetch-plugins.sh 后生成）
-└── docs/                     # 文档
-    ├── quick-start.md        # 快速开始
-    ├── module-usage.md       # 模块使用指南
-    ├── custom-ads.md         # 自定义广告过滤
-    ├── troubleshooting.md    # 故障排除
-    ├── testing-guide.md      # 测试指南
-    └── cross-platform-conversion.md  # 🔥 跨平台转换指南
-tests/                        # 生成器和校验器测试
+```bash
+# Mac / Linux
+./quick-start.sh --check-only
+# Windows
+npm run quick-start -- --check-only
 ```
 
----
+看到 `Node v... OK. No npm install is required.` 就说明电脑环境可以用。
 
-## 🧠 Agent 工作流总览
+### 生成失败
 
-```
-用户输入
-  │
-  ▼
-┌─────────────────────────────────────────────┐
-│         识别用户场景（工作流 0）                │
-│  订阅链接 / 生成配置 / 去广告 / 转换 / 优化      │
-└──────────────────┬──────────────────────────┘
-                   │
-        ┌──────────┼──────────┬──────────┐
-        ▼          ▼          ▼          ▼
-    ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐
-    │工作流1│  │工作流2│  │工作流3│  │工作流4│
-    │订阅解│  │配置生│  │去广告│  │跨平台│
-    │  析  │  │  成  │  │集 成│  │转 换│
-    └──────┘  └──────┘  └──────┘  └──────┘
-       │          │         │         │
-       ▼          ▼         ▼         ▼
-    ┌─────────────────────────────────────┐
-    │           工作流 5：配置优化           │
-    │       诊断卡顿/断网/耗电问题           │
-    └─────────────────────────────────────┘
-       │
-       ▼
-    ┌─────────────────────────────────────┐
-    │           输出完整配置                │
-    │    + 安装指导 + 注意事项              │
-    └─────────────────────────────────────┘
-```
+先检查这几件事：
 
-### Agent 执行契约
+1. 链接是不是完整复制了。
+2. 每一行是不是只有一个链接。
+3. 页面里有没有选择平台。
+4. 订阅链接在当前网络下能不能访问。
+5. 服务商后台的链接有没有过期。
 
-Agent 生成 Surge 配置时应优先走可执行 Module：
+还是失败的话，看页面右侧或终端里的错误提示，再去 [故障排除指南](docs/troubleshooting.md) 查。
 
-1. 用户给单节点 URI 或订阅 URL/文件时，优先调用 `node scripts/surge-config-generator.js --address <uri-or-url> --services <list> --output <profile.conf>`
-2. 用户给结构化需求时，调用 `node scripts/surge-config-generator.js --input <input.json> --output <profile.conf>`
-3. 生成器默认会自检；如手工补过配置，必须再调用 `node scripts/surge-config-validator.js <profile.conf>` 检查输出
-4. 只有校验无 error 时才把配置交给用户；warning 必须说明风险和处理建议，严谨交付时加 `--strict`
+### 导入后不能用
 
----
+先按顺序检查：
 
-## 🛡️ 去广告体系（四层拦截）
+1. 导入的是不是主配置文件，而不是额外的去广告文件。
+2. App 里有没有真正启用这个新配置。
+3. 手机当前网络是否正常。
+4. 订阅链接或节点是否已经过期。
+5. 服务商账号是否还有流量。
 
-```
-用户请求 → Surge 接管
-  ├─ L1 规则拦截: 广告域名 → REJECT（直接拒绝）
-  │   ├─ surge-tuner 本地规则集（精准拦截广告 SDK）
-  │   ├─ anti-ad 在线规则集（~2.5万条，自动更新）
-  │   └─ blackmatrix7 规则集（国际补充）
-  ├─ L2 MITM解密: HTTPS 流量解密
-  ├─ L3 脚本清洗: JavaScript 移除响应中的广告数据
-  └─ L4 Header清洗: 移除追踪参数和 Header
-```
+不要一开始就改复杂设置，先确认主配置能不能连通。
 
-### 覆盖的广告 SDK
+### 去广告不生效
 
-| SDK | 拦截方式 | 说明 |
-|-----|---------|------|
-| 穿山甲 (Pangle) | 规则+脚本 | 字节系，国内占有率最高 |
-| 广点通 (GDT) | 规则+脚本 | 腾讯系 |
-| 百度广告 | 规则+脚本 | 百度系 |
-| 快手广告 | 规则 | 快手系 |
-| Admob/DoubleClick | 规则+脚本 | Google 系 |
-| AppLovin/Vungle/Unity | 规则 | 国际广告平台 |
-| AppsFlyer/Adjust | 规则 | 归因追踪 |
+第一次使用建议先不折腾去广告。先确认代理能正常使用。
 
----
+如果主配置已经能用，再检查：
 
-## 🔧 配置示例预览
+1. 生成时有没有勾选去广告。
+2. 额外生成的去广告文件有没有导入。
+3. App 里是否开启了对应的证书和解密设置。
+4. 手机系统是否信任了 App 生成的证书。
 
-生成后的 Surge 配置结构：
+证书和解密设置比较敏感，里面的私密内容不要发给别人。详细步骤看 [MITM 配置指南](docs/mitm-setup.md)。
 
-```ini
-[General]
-# 通用设置：内网直连、Apple 直连、DNS、日志等
+### 真实链接能不能发给别人
 
-[Proxy]
-# 所有代理节点（由订阅自动填充）
-# 🇭🇰 香港-01 = ss, server, port, ...
-# 🇯🇵 东京-01 = trojan, server, port, ...
+不要发。
 
-[Proxy Group]
-# 区域策略组（URL-Test 自动测速）
-# 🇭🇰 香港节点 = url-test, regex=🇭🇰|香港|HK, ...
-# 🇯🇵 日本节点 = url-test, regex=🇯🇵|日本|JP, ...
-# 服务策略组
-# Telegram = url-test, ...
-# YouTube = url-test, ...
-# Netflix = select, ...
+订阅链接、节点链接、生成后的配置文件都可能包含你的服务商 token。别人拿到以后，可能直接使用你的流量。
 
-[Rule]
-# 规则匹配（从上到下）
-# Apple 直连 → 广告拦截 → 国内直连 → 国际服务 → 兜底
+不要把这些内容发到：
 
-[MITM]
-# HTTPS 解密配置（去广告必须）
+- 微信群
+- QQ 群
+- 朋友圈
+- 公开 GitHub 仓库
+- 论坛
+- 截图
 
-[Script]
-# JavaScript 广告清洗脚本
+## 给懂技术的人
+
+如果你熟悉终端，可以直接用命令生成。
+
+### 命令行生成
+
+先把自己的链接写到一个文本文件 `my-addresses.txt`，每行一个。用你喜欢的编辑器（Mac/Linux 可以用 `nano`，Windows 可以用 `notepad`）。
+
+生成 Surge：
+
+```bash
+npm run generate:surge -- --addresses ./my-addresses.txt --preset common --adblock --output ./surge.conf
 ```
 
----
+生成 Loon：
 
-## 📚 参考文档
+```bash
+npm run generate:loon -- --addresses ./my-addresses.txt --preset common --adblock --output ./loon.conf
+```
 
-| 文档 | 说明 |
-|------|------|
-| `proxy-tuner.skill.md` | **主技能文件** — 完整的 Agent 工作流定义（必读） |
-| `rules/services/README.md` | 服务→区域策略映射表 |
-| `rules/regions/detection-rules.md` | 节点按名称检测地区的正则规则 |
-| `rules/protocols/protocols.md` | 代理协议 URI 解析和格式转换 |
-| `docs/cross-platform-conversion.md` | Surge↔Loon↔QX↔Clash 格式转换 |
-| `docs/kelee-integration.md` | kelee.one 去广告插件集成指南 |
-| `docs/quick-start.md` | 快速开始指南 |
-| `docs/module-usage.md` | 模块使用说明 |
-| `docs/troubleshooting.md` | 常见问题排查 |
+生成 Quantumult X：
 
----
+```bash
+npm run generate:qx -- --addresses ./my-addresses.txt --preset common --adblock --output ./quantumultx.conf
+```
 
-## 📄 许可
+生成 Clash/Stash：
 
-本项目仅供学习研究使用，请遵守相关法律法规。
+```bash
+npm run generate:clash -- --addresses ./my-addresses.txt --preset common --adblock --output ./clash.yaml
+```
+
+### 测试工具是否能跑
+
+仓库里有测试用示例，可以验证本地工具链：
+
+```bash
+node scripts/surge-config-generator.js --addresses tests/fixtures/sample-subscription.txt --preset common --adblock --output ./surge-tuner-readme-smoke.conf
+node scripts/surge-config-validator.js ./surge-tuner-readme-smoke.conf
+```
+
+看到类似下面的输出就说明生成和检查正常：
+
+```text
+./surge-tuner-readme-smoke.conf: ok
+```
+
+测试示例地址不能当作真实代理使用。
+
+### A2A 和开发文档
+
+| 你想做什么 | 入口 |
+|------------|------|
+| 启动可视化页面 | `npm run quick-start` |
+| 让其他 Agent 调用 | `npm run start:a2a`，详见 [docs/a2a.md](docs/a2a.md) |
+| 跑完整检查 | `npm run check` |
+| 查看用户说明 | [docs/user-guide.md](docs/user-guide.md) |
+| 查看证书和去广告设置 | [docs/mitm-setup.md](docs/mitm-setup.md) |
+| 排查问题 | [docs/troubleshooting.md](docs/troubleshooting.md) |
+| 查看测试说明 | [docs/testing-guide.md](docs/testing-guide.md) |
+
+## 说明
+
+本项目仅供学习和个人配置管理使用。请遵守当地法律法规以及服务商、客户端的使用条款。

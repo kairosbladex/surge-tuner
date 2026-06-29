@@ -12,6 +12,7 @@
     "convert": "node scripts/cross-platform-converter.js",
     "adblock": "node scripts/adblock-installer.js",
     "prefs": "node scripts/user-preference-store.js",
+    "quick-start": "node scripts/quick-start-server.js",
     "start:a2a": "node scripts/a2a-server.js",
     "validate": "node scripts/surge-config-validator.js --all",
     "test": "node --test tests/*.test.js",

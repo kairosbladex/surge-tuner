@@ -27,6 +27,9 @@ const {
 } = require('./platform-base');
 
 const { loadProxySource } = require('./surge-proxy-parser');
+const { splitList, applyServicePreset, buildProxySourceOptions } = require('./generator-common');
+const { prepareCatalogForServices } = require('./rule-discovery');
+const { writeAdblockSidecar } = require('./adblock-artifacts');
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 // ── Clash Constants ─────────────────────────────────────────────────────────────
@@ -120,7 +123,7 @@ function generateClashConfig(input, options = {}) {
   proxyGroups.push({
     name: 'All',
     type: 'select',
-    proxies: unclassified.length > 0 ? unclassified.map((p) => p.name) : ['DIRECT']
+    proxies: proxies.length > 0 ? proxies.map((p) => p.name) : ['DIRECT']
   });
 
   // Region groups
@@ -372,18 +375,26 @@ function generateClashConfig(input, options = {}) {
 
 function parseArgs(argv) {
   const args = {
-    input: null, address: null, addressFile: null, output: null,
-    catalog: null, services: [], adBlock: false, validate: true, strict: false, help: false
+    input: null, address: null, addresses: null, addressFile: null, output: null,
+    catalog: null, services: [], preset: null, discoverRules: false, adblockOutput: null,
+    unified: false, subscription: [],
+    adBlock: false, validate: true, strict: false, help: false
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') args.help = true;
     else if (arg === '--input' || arg === '-i') args.input = argv[++i];
     else if (arg === '--address' || arg === '-a') args.address = argv[++i];
+    else if (arg === '--addresses') args.addresses = argv[++i];
     else if (arg === '--address-file') args.addressFile = argv[++i];
     else if (arg === '--output' || arg === '-o') args.output = argv[++i];
+    else if (arg === '--adblock-output') args.adblockOutput = argv[++i];
     else if (arg === '--catalog') args.catalog = argv[++i];
-    else if (arg === '--services') args.services = String(argv[++i]).split(',').map((s) => s.trim()).filter(Boolean);
+    else if (arg === '--services') args.services = splitList(argv[++i]);
+    else if (arg === '--preset') args.preset = argv[++i];
+    else if (arg === '--discover-rules') args.discoverRules = true;
+    else if (arg === '--unified') args.unified = true;
+    else if (arg === '--subscription') args.subscription.push(argv[++i]);
     else if (arg === '--adblock') args.adBlock = true;
     else if (arg === '--no-adblock') args.adBlock = false;
     else if (arg === '--skip-validate') args.validate = false;
@@ -397,29 +408,45 @@ function usage() {
   return [
     'Usage:',
     '  node scripts/clash-config-generator.js --input <config.json> [--output <clash.yaml>]',
-    '  node scripts/clash-config-generator.js --address <proxy-uri-or-subscription-url> [--services Telegram,YouTube] [--adblock] [--output <clash.yaml>]'
+    '  node scripts/clash-config-generator.js --address <proxy-uri-or-subscription-url> [--services Telegram,YouTube] [--adblock] [--output <clash.yaml>]',
+    '  node scripts/clash-config-generator.js --addresses <file-or-json-array> [--preset common] [--discover-rules] [--adblock] [--output <clash.yaml>]',
+    '  node scripts/clash-config-generator.js --unified --subscription <name|url> [--subscription ...] [--preset common] [--adblock] [--output <clash.yaml>]'
   ].join('\n');
 }
 
 async function buildInputFromArgs(args) {
-  if (args.input) return JSON.parse(fs.readFileSync(path.resolve(process.cwd(), args.input), 'utf8'));
-  const proxies = await loadProxySource({
-    address: args.address,
-    addressFile: args.addressFile ? path.resolve(process.cwd(), args.addressFile) : null
-  });
-  return { proxies, services: args.services, adBlock: args.adBlock };
+  if (args.input) return applyServicePreset(JSON.parse(fs.readFileSync(path.resolve(process.cwd(), args.input), 'utf8')));
+  if (args.unified && args.subscription.length > 0) {
+    const subscriptions = args.subscription.map((raw, index) => {
+      const sep = raw.indexOf('|');
+      const name = sep > 0 ? raw.slice(0, sep) : `机场${index + 1}`;
+      const url = sep > 0 ? raw.slice(sep + 1) : raw;
+      return { name, url, updateInterval: 86400 };
+    });
+    return applyServicePreset({ unified: true, subscriptions, services: args.services, adBlock: args.adBlock, preset: args.preset });
+  }
+  const proxies = await loadProxySource(buildProxySourceOptions(args));
+  return applyServicePreset({ proxies, services: args.services, adBlock: args.adBlock, preset: args.preset });
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (args.help || (!args.input && !args.address && !args.addressFile)) {
+  const hasInput = args.input || args.address || args.addresses || args.addressFile
+    || (args.subscription.length > 0);
+  if (args.help || !hasInput) {
     console.log(usage());
     process.exit(args.help ? 0 : 1);
   }
 
   const input = await buildInputFromArgs(args);
+  const catalogPath = args.catalog ? path.resolve(process.cwd(), args.catalog) : undefined;
+  const catalogResult = await prepareCatalogForServices(input.services, {
+    catalogPath,
+    discoverRules: args.discoverRules,
+    platform: 'clash'
+  });
   const config = generateClashConfig(input, {
-    catalogPath: args.catalog ? path.resolve(process.cwd(), args.catalog) : undefined
+    catalog: catalogResult.catalog
   });
 
   const outputPath = args.output
@@ -436,6 +463,12 @@ async function main() {
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, config);
+  if (input.adBlock && !input.unified) {
+    const sidecar = writeAdblockSidecar(outputPath, 'clash', {
+      outputPath: args.adblockOutput
+    });
+    console.log(`Clash ad-block artifact written to ${sidecar.path}`);
+  }
   console.log(`Clash config written to ${outputPath}`);
 }
 
