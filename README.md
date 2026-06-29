@@ -1,37 +1,86 @@
-# Proxy Tuner — 跨平台代理配置自动生成 & 去广告工具包
+# Proxy Tuner — Agent-to-Agent 代理配置自动生成 & 去广告工具包
 
-> 🚀 **根据用户导入的机场地址，自动解析节点、按地区分组、匹配境外服务，一键生成优化配置**
+> 🤖 **A2A (Agent-to-Agent) 智能代理 — 根据 VPN 地址自动解析节点、生成多平台路由规则、安装去广告插件、记忆用户偏好**
 
 ---
 
 ## 🌟 项目愿景
 
-**Proxy Tuner** 是一个纯 AI Agent 驱动的配置生成器，致力于解决代理配置中的两大痛点：
+**Proxy Tuner** 是一个 **纯 AI Agent 驱动的 A2A（Agent-to-Agent）配置生成器**，致力于解决代理配置中的三大痛点：
 
 1. **配置繁琐** — 机场订阅节点多，手动分不清地区，策略组配到手软
 2. **广告困扰** — 去广告规则分散，集成困难
+3. **跨平台隔离** — Surge/Loon/QX/Clash 配置互不兼容，切换成本高
 
-我们通过一个 **交互式 Agent**（Skill 文件），让 AI 帮你完成所有工作。
+我们通过 **A2A 协议** 和 **8 个 Skill**，让 AI Agent 帮你完成所有工作。
 
----
+### 核心能力矩阵
 
-## 🎯 核心能力
-
-| 能力 | 说明 | 对应工作流 |
-|------|------|-----------|
-| 🔗 **订阅解析** | 自动拉取机场订阅，识别每个节点的协议、地区、线路类型 | 工作流 1 |
-| 🌍 **节点分类** | 通过节点名称中的 Emoji/中文/英文，自动分配到对应地区组 | 工作流 1 |
-| 🧠 **智能策略** | 为每个服务推荐最优策略类型（URL-Test/Smart/Select） | 工作流 2 |
-| 📋 **配置生成** | 生成完整的 Surge 配置，含 General/Proxy/Proxy Group/Rule/MITM | 工作流 2 |
-| 🛡️ **去广告集成** | 集成 surge-tuner 本地规则 + anti-ad 在线规则 + kelee.one 插件 | 工作流 3 |
-| 🔄 **跨平台转换** | Surge ↔ Loon ↔ Quantumult X ↔ Clash 配置互转 | 工作流 4 |
-| ⚡ **配置优化** | 诊断卡顿/断网/耗电问题，提供优化建议 | 工作流 5 |
+| 能力 | 说明 | 对应 A2A Skill |
+|------|------|---------------|
+| 🔗 **订阅解析** | 自动拉取机场订阅，识别每个节点的协议、地区、线路类型 | `parse-proxies` |
+| 🌍 **节点分类** | 通过节点名称中的 Emoji/中文/英文，自动分配到对应地区组 | 所有 generate-* |
+| 🧠 **智能策略** | 为每个服务推荐最优策略类型（URL-Test/Smart/Select） | 所有 generate-* |
+| 📋 **跨平台生成** | 生成 Surge/Loon/QX/Clash 四平台配置 | `generate-*-profile` |
+| 🔄 **跨平台转换** | Surge ↔ Loon ↔ Quantumult X ↔ Clash 配置互转 | `convert-config` |
+| 🛡️ **去广告集成** | 自动生成去广告模块，集成 kelee.one + anti-ad + 自定义域名 | `install-adblock` |
+| 💾 **用户偏好** | 记住用户的平台偏好、常用服务、自定义规则 | `manage-preferences` |
+| ✅ **自动校验** | 生成后自动校验配置合法性，拒绝输出有 error 的配置 | 内置 |
 
 ---
 
 ## 🚀 快速开始
 
-### 方式一：交互式 Agent（推荐）
+### 方式一：A2A Remote Agent（推荐 — 给其他 Agent 调用）
+
+启动 A2A HTTP+JSON 服务，暴露 8 个 Skill 供其他 Agent 自动发现和调用；`message:stream` 和 `tasks/{id}:subscribe` 提供本地 SSE 事件流：
+
+```bash
+npm run start:a2a
+```
+
+默认地址：`http://127.0.0.1:8787`
+
+```bash
+# 发现能力
+curl -H 'A2A-Version: 1.0' http://127.0.0.1:8787/.well-known/agent-card.json
+
+# 生成 Surge 配置
+curl -sS -X POST http://127.0.0.1:8787/message:send \
+  -H 'content-type: application/a2a+json' \
+  -H 'A2A-Version: 1.0' \
+  --data '{
+    "message": {
+      "parts": [{
+        "data": {
+          "address": "trojan://secret@example.com:443?sni=example.com#US-01",
+          "services": ["Telegram", "ChatGPT"],
+          "adBlock": true
+        }
+      }]
+    }
+  }'
+
+# SSE 事件流生成
+curl -sS -N -X POST http://127.0.0.1:8787/message:stream \
+  -H 'content-type: application/a2a+json' \
+  -H 'A2A-Version: 1.0' \
+  --data '{"message":{"parts":[{"data":{"address":"trojan://...","platform":"clash"}}]}}'
+
+# 查询任务
+curl -H 'A2A-Version: 1.0' http://127.0.0.1:8787/tasks/<task-id>
+
+# SSE 订阅任务状态
+curl -sS -N http://127.0.0.1:8787/tasks/<task-id>:subscribe
+
+# 取消任务
+curl -X POST http://127.0.0.1:8787/tasks/<task-id>:cancel \
+  -H 'A2A-Version: 1.0'
+```
+
+所有端点说明详见 `docs/a2a.md`。
+
+### 方式二：交互式 Agent
 
 直接与 Agent 对话，输入你的需求：
 
@@ -40,11 +89,13 @@
 "给我的节点按香港/日本/美国分类"
 "帮我集成去广告规则到现有配置"
 "把这份 Surge 配置转成 Loon 的"
+"帮我生成 Loon 和 Clash 两套配置"
+"记住我喜欢用 Clash，常用 Telegram 和 YouTube"
 ```
 
-Agent 会自动执行对应工作流，与你交互确认后生成配置。
+Agent 会自动调用对应的 A2A Skill，与你交互确认后生成配置。
 
-### 方式二：直接使用模板
+### 方式三：直接使用模板
 
 如果你已经熟悉配置，可以直接使用 `templates/` 目录下的模板：
 
@@ -52,11 +103,11 @@ Agent 会自动执行对应工作流，与你交互确认后生成配置。
 - `templates/base.conf` — 基础稳定版
 - `templates/surge-ios-base.conf` — iOS 省电版
 
-### 方式三：使用去广告模块（原有功能）
+### 方式四：使用去广告模块（原有功能）
 
 将 `modules/` 下的 `.sgmodule` 文件放入 Surge 配置目录即可启用。
 
-### 方式四：可执行生成与校验（推荐给 Agent / 维护者）
+### 方式五：可执行生成与校验（推荐给 Agent / 维护者）
 
 本仓库现在提供零依赖 Node 工具，把配置生成和风险检查从“只靠提示词”收敛为可验证的 Module：
 
@@ -76,9 +127,9 @@ npm test
 
 生成器默认会在写出前调用校验器；发现 error 会拒绝输出成品配置。需要把 warning 也当失败时加 `--strict`，只有排查生成器本身时才使用 `--skip-validate`。
 
-### 方式五：A2A Remote Agent（给其他 Agent 调用）
+### 方式六：A2A Remote Agent（给其他 Agent 调用）
 
-启动本地 A2A HTTP+JSON 服务：
+启动本地 A2A HTTP+JSON 服务，并启用本地 SSE 事件流：
 
 ```bash
 npm run start:a2a
@@ -86,11 +137,38 @@ npm run start:a2a
 
 默认地址：`http://127.0.0.1:8787`
 
-- Agent Card：`GET /.well-known/agent-card.json`
-- 发送生成任务：`POST /message:send`
-- 查询任务：`GET /tasks/{id}`
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/.well-known/agent-card.json` | GET | 发现 8 个 Agent Skill |
+| `/message:send` | POST | 提交生成/转换/去广告/偏好任务 |
+| `/message:stream` | POST | SSE 包装提交任务并返回状态事件 |
+| `/tasks/{id}` | GET | 查询任务结果 |
+| `/tasks/{id}:subscribe` | GET | SSE 订阅内存任务状态 |
+| `/tasks/{id}:cancel` | POST | 取消尚未终态的任务 |
+| `/tasks` | GET | 列出所有任务 |
+| `/healthz` | GET | 健康检查 |
 
-详见 `docs/a2a.md`。当前 MVP 支持同步生成 Surge 配置和轮询任务结果，暂不支持 streaming、push notification 和 OAuth。
+边界说明：
+
+- 任务存储在当前进程内存中，服务重启后不会保留历史任务。
+- 当前不提供 OAuth、Webhook 或外部 push notification；需要鉴权时应放在反向代理或上层 Agent 网关。
+- 远程调用默认不能读本机文件；`addressFile` 和 `configPath` 只有在 `A2A_ALLOW_LOCAL_FILES=1` 时可用。
+- `configs/user-preferences.json` 和 `reasonix.toml` 是本机运行态文件，已加入忽略列表，避免提交真实订阅或本机 Agent 权限配置。
+
+当前支持的 8 个 Skill：
+
+| Skill | 功能 |
+|-------|------|
+| `generate-surge-profile` | 生成 Surge 配置 |
+| `generate-loon-profile` | 生成 Loon 配置 |
+| `generate-quantumultx-profile` | 生成 Quantumult X 配置 |
+| `generate-clash-profile` | 生成 Clash YAML 配置 |
+| `convert-config` | Surge ↔ Loon ↔ QX ↔ Clash 转换 |
+| `install-adblock` | 安装去广告插件（自动生成模块/规则） |
+| `manage-preferences` | 管理用户偏好 |
+| `parse-proxies` | 解析代理节点 |
+
+详见 `docs/a2a.md`。
 
 ---
 
@@ -116,10 +194,18 @@ surge-tuner/
 │   ├── Anti-Tracking.sgmodule      # 隐私追踪拦截
 │   ├── Ad-Block-All.sgmodule       # 全能广告合辑
 │   └── Stable-Optimization.sgmodule # 稳定性优化
-├── scripts/                  # Surge JavaScript 脚本
-│   ├── a2a-agent.js          # A2A 任务适配层
-│   ├── a2a-server.js         # A2A HTTP+JSON 服务入口
-│   ├── surge-config-generator.js # 配置生成 CLI（Agent 调用入口）
+├── scripts/                  # 🔥 Node.js 脚本（可执行 Module）
+│   ├── a2a-server.js         # A2A HTTP+JSON+SSE 服务（8 Skills）
+│   ├── a2a-agent.js          # A2A 多 Skill 路由 & 任务创建
+│   ├── a2a-task-manager.js   # 任务生命周期管理（SSE订阅/取消）
+│   ├── platform-base.js      # 跨平台配置生成公共逻辑
+│   ├── surge-config-generator.js # Surge 配置生成 CLI
+│   ├── loon-config-generator.js  # 🔥 Loon 配置生成 CLI
+│   ├── quantumultx-config-generator.js # 🔥 QX 配置生成 CLI
+│   ├── clash-config-generator.js  # 🔥 Clash YAML 配置生成 CLI
+│   ├── cross-platform-converter.js # 🔥 Surge↔Loon↔QX↔Clash 转换引擎
+│   ├── adblock-installer.js  # 🔥 去广告插件自动安装（全平台）
+│   ├── user-preference-store.js # 🔥 用户偏好持久化
 │   ├── surge-proxy-parser.js # 节点 URI / 订阅内容解析
 │   ├── surge-config-validator.js # 配置校验 CLI（导入前检查）
 │   ├── ad-block-all.js       # 全能广告拦截

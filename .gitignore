@@ -18,9 +18,11 @@ configs/generated/
 
 # AI 会话数据
 .reasonix/
+reasonix.toml
 
 # 运行时生成的文件
 kelee/list.json
+configs/user-preferences.json
 
 # Node
 node_modules/
