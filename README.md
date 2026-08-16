@@ -389,6 +389,7 @@ node scripts/surge-config-validator.js ./surge-tuner-readme-smoke.conf
 |------------|------|
 | 启动可视化页面 | `npm run quick-start` |
 | 让其他 Agent 调用 | `npm run start:a2a`，详见 [docs/a2a.md](docs/a2a.md) |
+| 安装 DSH 智能体预设（自然语言生成配置） | 运行 `agent/install.ps1`（Windows）或 `bash agent/install.sh`（macOS/Linux），详见 [agent/README.md](agent/README.md) |
 | 跑完整检查 | `npm run check` |
 | 查看用户说明 | [docs/user-guide.md](docs/user-guide.md) |
 | 查看证书和去广告设置 | [docs/mitm-setup.md](docs/mitm-setup.md) |

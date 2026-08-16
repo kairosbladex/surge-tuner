@@ -1,0 +1,2 @@
+name: Surge 配置助手
+description: 根据 VPN 节点或订阅地址自动解析、生成并校验 Surge 配置文件的专用智能体（基于 surge-tuner 引擎）。
