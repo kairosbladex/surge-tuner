@@ -99,8 +99,11 @@ class UserPreferenceStore {
     this._data = null;
   }
 
+  // 每次都从磁盘重新读取，不在内存里长期缓存：
+  // CLI 与长驻 A2A 进程可能并存读写同一文件，写前重读才能在他人的修改之上合并，
+  // 避免用陈旧缓存整体覆盖文件。文件仅几 KB 且访问频率低（每次 CLI 调用 / A2A 任务），
+  // 重读开销可忽略，也比按 mtime 失效缓存更确定（不受 mtime 精度影响）。
   _load() {
-    if (this._data) return this._data;
     try {
       if (fs.existsSync(this.storePath)) {
         const raw = fs.readFileSync(this.storePath, 'utf8');
@@ -115,18 +118,28 @@ class UserPreferenceStore {
     return this._data;
   }
 
+  // 原子写：先写同目录临时文件再 rename 替换（同目录保证同盘，rename 才是原子操作），
+  // 避免进程中断时留下写了一半的 JSON。临时文件名带 pid，避免多进程互踩。
   _save() {
     if (!this._data) return;
     this._data.updatedAt = new Date().toISOString();
     fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
-    fs.writeFileSync(this.storePath, JSON.stringify(this._data, null, 2), 'utf8');
+    const tmpPath = `${this.storePath}.${process.pid}.tmp`;
+    try {
+      fs.writeFileSync(tmpPath, JSON.stringify(this._data, null, 2), 'utf8');
+      fs.renameSync(tmpPath, this.storePath);
+    } catch (error) {
+      try { fs.unlinkSync(tmpPath); } catch (_) { /* 临时文件可能没写出来，忽略 */ }
+      throw error;
+    }
   }
 
   /**
    * Get all preferences.
+   * 返回深拷贝，调用方改动返回值（如 push 嵌套数组）不会污染 store 内部数据。
    */
   getAll() {
-    return { ...this._load() };
+    return JSON.parse(JSON.stringify(this._load()));
   }
 
   /**
@@ -148,7 +161,6 @@ class UserPreferenceStore {
         console.warn(`Unknown preference key: ${key}. Ignoring.`);
       }
     }
-    this._data = data;
     this._save();
   }
 
@@ -156,6 +168,9 @@ class UserPreferenceStore {
    * Add a custom ad domain to block.
    */
   addAdDomain(domain) {
+    if (typeof domain !== 'string') {
+      throw new Error(`addAdDomain: domain must be a string, got ${typeof domain}`);
+    }
     const data = this._load();
     const clean = domain.trim().replace(/^[*-]+\s*/, '');
     if (clean && !data.customAdDomains.includes(clean)) {
@@ -171,6 +186,9 @@ class UserPreferenceStore {
    * Remove a custom ad domain.
    */
   removeAdDomain(domain) {
+    if (typeof domain !== 'string') {
+      throw new Error(`removeAdDomain: domain must be a string, got ${typeof domain}`);
+    }
     const data = this._load();
     const clean = domain.trim().replace(/^[*-]+\s*/, '');
     const index = data.customAdDomains.indexOf(clean);
@@ -186,6 +204,9 @@ class UserPreferenceStore {
    * Add a subscription URL.
    */
   addSubscription(name, url) {
+    if (typeof name !== 'string' || typeof url !== 'string') {
+      throw new Error(`addSubscription: name and url must be strings, got ${typeof name} and ${typeof url}`);
+    }
     const data = this._load();
     const existing = data.subscriptions.find((s) => s.url === url);
     if (!existing) {
@@ -200,6 +221,9 @@ class UserPreferenceStore {
    * Remove a subscription.
    */
   removeSubscription(url) {
+    if (typeof url !== 'string') {
+      throw new Error(`removeSubscription: url must be a string, got ${typeof url}`);
+    }
     const data = this._load();
     const index = data.subscriptions.findIndex((s) => s.url === url);
     if (index >= 0) {
@@ -214,6 +238,9 @@ class UserPreferenceStore {
    * Add a custom routing rule.
    */
   addCustomRule(type, value, policy) {
+    if (typeof type !== 'string' || typeof value !== 'string' || typeof policy !== 'string') {
+      throw new Error(`addCustomRule: type, value and policy must be strings, got ${typeof type}, ${typeof value} and ${typeof policy}`);
+    }
     const data = this._load();
     data.customRules.push({ type, value, policy });
     this._save();

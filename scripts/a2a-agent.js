@@ -20,7 +20,6 @@ const { generateQuantumultXConfig } = require('./quantumultx-config-generator');
 const { generateClashConfig } = require('./clash-config-generator');
 const { convertConfig, detectPlatform } = require('./cross-platform-converter');
 const { generateSurgeModule, generateLoonAdblockConfig, generateClashRuleProviders, generateQXAdblockConfig, integrateAdblockIntoConfig } = require('./adblock-installer');
-const { UserPreferenceStore } = require('./user-preference-store');
 const { loadProxySource } = require('./surge-proxy-parser');
 const { TASK_STATE, TaskStore, SkillRouter } = require('./a2a-task-manager');
 const { applyServicePreset } = require('./generator-common');
@@ -167,9 +166,58 @@ function buildAgentCard(baseUrl) {
 
 // ── Skill Handlers ──────────────────────────────────────────────────────────────
 
-function registerSkills(router, taskStore, preferenceStore) {
-  // Generate Surge Profile
-  router.register('generate-surge-profile', async (task, input, options) => {
+// 四个平台 generate handler 的差异配置表：handler 流程完全相同，差异仅在生成函数、
+// 进度/结果文案、默认文件名、MIME 类型；surge 额外多一步 validate（产出 warnings 与 inputSummary）。
+// withRules：原 handler 是否把 input.rules 透传进 genInput——仅 surge/loon 透传，
+// qx/clash 不透传（clash 生成器会消费 input.rules，透传与否影响生成结果，必须逐平台保真）。
+const PLATFORM_PROFILES = {
+  surge: {
+    generate: generateSurgeConfig,
+    label: 'Surge',
+    fileName: DEFAULT_PROFILE_NAME,
+    mimeType: 'text/plain',
+    withRules: true,
+    progressText: (genInput) => `Generating Surge config (${(genInput.proxies || []).length} proxies)...`,
+    profileDescription: 'Validated Surge for iOS profile.',
+    validate: (config, profileName, input) => validateGeneratedConfig(
+      config,
+      path.join('configs', 'generated', profileName),
+      { strict: Boolean(input.strict) }
+    )
+  },
+  loon: {
+    generate: generateLoonConfig,
+    label: 'Loon',
+    fileName: 'loon-profile.conf',
+    mimeType: 'text/plain',
+    withRules: true,
+    progressText: () => 'Generating Loon config...',
+    profileDescription: 'Generated Loon proxy configuration.'
+  },
+  quantumultx: {
+    generate: generateQuantumultXConfig,
+    label: 'Quantumult X',
+    fileName: 'qx-profile.conf',
+    mimeType: 'text/plain',
+    progressText: () => 'Generating Quantumult X config...',
+    profileDescription: 'Generated Quantumult X configuration.'
+  },
+  clash: {
+    generate: generateClashConfig,
+    label: 'Clash',
+    fileName: 'clash-profile.yaml',
+    mimeType: 'application/x-yaml',
+    progressText: () => 'Generating Clash YAML config...',
+    profileDescription: 'Generated Clash YAML configuration.'
+  }
+};
+
+// 注册 generate-<platform>-profile skill 的工厂函数。
+// artifacts 形状与消息文案逐字保持原四份 handler：surge 的 generation-result 多
+// description/warnings/inputSummary，其余平台只有 ok/platform/profileName/discoveries/outputBytes。
+function registerGenerateProfileSkill(router, taskStore, platform) {
+  const spec = PLATFORM_PROFILES[platform];
+  router.register(`generate-${platform}-profile`, async (task, input, options) => {
     const ctx = options.ctx || {};
     const pref = ctx.prefs || {};
 
@@ -181,194 +229,79 @@ function registerSkills(router, taskStore, preferenceStore) {
       services: input.services || pref.commonServices || [],
       adBlock: input.adBlock ?? (pref.adBlockLevel !== 'none'),
       finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流',
-      rules: input.rules || [],
+      ...(spec.withRules ? { rules: input.rules || [] } : {}),
       preset: input.preset
     });
 
-    taskStore.addProgress(task.id, `Generating Surge config (${(genInput.proxies || []).length} proxies)...`);
+    taskStore.addProgress(task.id, spec.progressText(genInput));
     const catalogResult = await prepareCatalogForServices(genInput.services, {
       discoverRules: Boolean(input.discoverRules),
-      platform: 'surge',
+      platform,
       fetchImpl: options.fetchImpl,
       cachePath: options.ruleDiscoveryCachePath
     });
-    const config = generateSurgeConfig(genInput, { ...options, catalog: catalogResult.catalog });
+    const config = spec.generate(genInput, { ...options, catalog: catalogResult.catalog });
 
-    const profileName = input.profileName || DEFAULT_PROFILE_NAME;
-    taskStore.addProgress(task.id, 'Validating generated config...');
+    const profileName = input.profileName || spec.fileName;
 
-    const validation = validateGeneratedConfig(config, path.join('configs', 'generated', profileName), {
-      strict: Boolean(input.strict)
-    });
-    const warnings = validation.issues.filter((i) => i.severity === 'warning');
-
-    return {
-      state: TASK_STATE.COMPLETED,
-      message: warnings.length > 0
+    let message;
+    let resultData;
+    if (spec.validate) {
+      taskStore.addProgress(task.id, 'Validating generated config...');
+      const validation = spec.validate(config, profileName, input);
+      const warnings = validation.issues.filter((i) => i.severity === 'warning');
+      message = warnings.length > 0
         ? `Generated ${profileName} with ${warnings.length} validation warning(s).`
-        : `Generated validated Surge profile ${profileName}.`,
-      artifacts: [
-        {
-          artifactId: 'surge-profile',
-          name: profileName,
-          description: 'Validated Surge for iOS profile.',
-          parts: [{ text: config, metadata: { filename: profileName, mimeType: 'text/plain' } }]
-        },
-        {
-          artifactId: 'generation-result',
-          name: 'generation-result.json',
-          description: 'Machine-readable generation summary.',
-          parts: [{
-            data: {
-              ok: true,
-              platform: 'surge',
-              profileName,
-              warnings,
-              discoveries: catalogResult.discovered,
-              inputSummary: summarizeInput(genInput),
-              outputBytes: Buffer.byteLength(config, 'utf8')
-            }
-          }]
-        }
-      ].concat(adblockArtifactsForA2A('surge', genInput, input))
+        : `Generated validated ${spec.label} profile ${profileName}.`;
+      resultData = {
+        ok: true,
+        platform,
+        profileName,
+        warnings,
+        discoveries: catalogResult.discovered,
+        inputSummary: summarizeInput(genInput),
+        outputBytes: Buffer.byteLength(config, 'utf8')
+      };
+    } else {
+      message = `Generated ${spec.label} profile ${profileName}.`;
+      resultData = {
+        ok: true,
+        platform,
+        profileName,
+        discoveries: catalogResult.discovered,
+        outputBytes: Buffer.byteLength(config, 'utf8')
+      };
+    }
+
+    const resultArtifact = {
+      artifactId: 'generation-result',
+      name: 'generation-result.json',
+      ...(spec.validate ? { description: 'Machine-readable generation summary.' } : {}),
+      parts: [{ data: resultData }]
     };
-  });
-
-  // Generate Loon Profile
-  router.register('generate-loon-profile', async (task, input, options) => {
-    const ctx = options.ctx || {};
-    const pref = ctx.prefs || {};
-
-    taskStore.addProgress(task.id, 'Parsing proxy source...');
-    const proxies = await maybeLoadProxies(input, options);
-    const genInput = applyServicePreset({
-      subscriptions: input.subscriptions || pref.subscriptions || [],
-      proxies: proxies || input.proxies || [],
-      services: input.services || pref.commonServices || [],
-      adBlock: input.adBlock ?? (pref.adBlockLevel !== 'none'),
-      finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流',
-      rules: input.rules || [],
-      preset: input.preset
-    });
-
-    taskStore.addProgress(task.id, 'Generating Loon config...');
-    const catalogResult = await prepareCatalogForServices(genInput.services, {
-      discoverRules: Boolean(input.discoverRules),
-      platform: 'loon',
-      fetchImpl: options.fetchImpl,
-      cachePath: options.ruleDiscoveryCachePath
-    });
-    const config = generateLoonConfig(genInput, { ...options, catalog: catalogResult.catalog });
-    const profileName = input.profileName || 'loon-profile.conf';
 
     return {
       state: TASK_STATE.COMPLETED,
-      message: `Generated Loon profile ${profileName}.`,
+      message,
       artifacts: [
         {
-          artifactId: 'loon-profile',
+          artifactId: `${platform}-profile`,
           name: profileName,
-          description: 'Generated Loon proxy configuration.',
-          parts: [{ text: config, metadata: { filename: profileName, mimeType: 'text/plain' } }]
+          description: spec.profileDescription,
+          parts: [{ text: config, metadata: { filename: profileName, mimeType: spec.mimeType } }]
         },
-        {
-          artifactId: 'generation-result',
-          name: 'generation-result.json',
-          parts: [{ data: { ok: true, platform: 'loon', profileName, discoveries: catalogResult.discovered, outputBytes: Buffer.byteLength(config, 'utf8') } }]
-        }
-      ].concat(adblockArtifactsForA2A('loon', genInput, input))
+        resultArtifact
+      ].concat(adblockArtifactsForA2A(platform, genInput, input))
     };
   });
+}
 
-  // Generate QX Profile
-  router.register('generate-quantumultx-profile', async (task, input, options) => {
-    const ctx = options.ctx || {};
-    const pref = ctx.prefs || {};
-
-    taskStore.addProgress(task.id, 'Parsing proxy source...');
-    const proxies = await maybeLoadProxies(input, options);
-    const genInput = applyServicePreset({
-      subscriptions: input.subscriptions || pref.subscriptions || [],
-      proxies: proxies || input.proxies || [],
-      services: input.services || pref.commonServices || [],
-      adBlock: input.adBlock ?? (pref.adBlockLevel !== 'none'),
-      finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流',
-      preset: input.preset
-    });
-
-    taskStore.addProgress(task.id, 'Generating Quantumult X config...');
-    const catalogResult = await prepareCatalogForServices(genInput.services, {
-      discoverRules: Boolean(input.discoverRules),
-      platform: 'quantumultx',
-      fetchImpl: options.fetchImpl,
-      cachePath: options.ruleDiscoveryCachePath
-    });
-    const config = generateQuantumultXConfig(genInput, { ...options, catalog: catalogResult.catalog });
-    const profileName = input.profileName || 'qx-profile.conf';
-
-    return {
-      state: TASK_STATE.COMPLETED,
-      message: `Generated Quantumult X profile ${profileName}.`,
-      artifacts: [
-        {
-          artifactId: 'quantumultx-profile',
-          name: profileName,
-          description: 'Generated Quantumult X configuration.',
-          parts: [{ text: config, metadata: { filename: profileName, mimeType: 'text/plain' } }]
-        },
-        {
-          artifactId: 'generation-result',
-          name: 'generation-result.json',
-          parts: [{ data: { ok: true, platform: 'quantumultx', profileName, discoveries: catalogResult.discovered, outputBytes: Buffer.byteLength(config, 'utf8') } }]
-        }
-      ].concat(adblockArtifactsForA2A('quantumultx', genInput, input))
-    };
-  });
-
-  // Generate Clash Profile
-  router.register('generate-clash-profile', async (task, input, options) => {
-    const ctx = options.ctx || {};
-    const pref = ctx.prefs || {};
-
-    taskStore.addProgress(task.id, 'Parsing proxy source...');
-    const proxies = await maybeLoadProxies(input, options);
-    const genInput = applyServicePreset({
-      subscriptions: input.subscriptions || pref.subscriptions || [],
-      proxies: proxies || input.proxies || [],
-      services: input.services || pref.commonServices || [],
-      adBlock: input.adBlock ?? (pref.adBlockLevel !== 'none'),
-      finalPolicy: input.finalPolicy || pref.finalPolicy || '兜底分流',
-      preset: input.preset
-    });
-
-    taskStore.addProgress(task.id, 'Generating Clash YAML config...');
-    const catalogResult = await prepareCatalogForServices(genInput.services, {
-      discoverRules: Boolean(input.discoverRules),
-      platform: 'clash',
-      fetchImpl: options.fetchImpl,
-      cachePath: options.ruleDiscoveryCachePath
-    });
-    const config = generateClashConfig(genInput, { ...options, catalog: catalogResult.catalog });
-    const profileName = input.profileName || 'clash-profile.yaml';
-
-    return {
-      state: TASK_STATE.COMPLETED,
-      message: `Generated Clash profile ${profileName}.`,
-      artifacts: [
-        {
-          artifactId: 'clash-profile',
-          name: profileName,
-          description: 'Generated Clash YAML configuration.',
-          parts: [{ text: config, metadata: { filename: profileName, mimeType: 'application/x-yaml' } }]
-        },
-        {
-          artifactId: 'generation-result',
-          name: 'generation-result.json',
-          parts: [{ data: { ok: true, platform: 'clash', profileName, discoveries: catalogResult.discovered, outputBytes: Buffer.byteLength(config, 'utf8') } }]
-        }
-      ].concat(adblockArtifactsForA2A('clash', genInput, input))
-    };
-  });
+function registerSkills(router, taskStore, preferenceStore) {
+  // Generate Profiles（四个平台共用同一工厂，skill 注册名保持不变）
+  registerGenerateProfileSkill(router, taskStore, 'surge');
+  registerGenerateProfileSkill(router, taskStore, 'loon');
+  registerGenerateProfileSkill(router, taskStore, 'quantumultx');
+  registerGenerateProfileSkill(router, taskStore, 'clash');
 
   // Convert Config
   router.register('convert-config', async (task, input, options) => {
@@ -380,7 +313,11 @@ function registerSkills(router, taskStore, preferenceStore) {
         throw new Error('configPath requires A2A_ALLOW_LOCAL_FILES=1');
       }
       const fs = require('fs');
-      configText = fs.readFileSync(path.resolve(REPO_ROOT, input.configPath), 'utf8');
+      const resolvedPath = path.resolve(REPO_ROOT, input.configPath);
+      if (resolvedPath !== REPO_ROOT && !resolvedPath.startsWith(REPO_ROOT + path.sep)) {
+        throw new Error('configPath must resolve inside the repository');
+      }
+      configText = fs.readFileSync(resolvedPath, 'utf8');
     }
     if (!configText) throw new Error('config or configPath is required');
 
@@ -808,11 +745,6 @@ function summarizeInput(input) {
     adBlock: input.adBlock === true,
     finalPolicy: input.finalPolicy || '兜底分流'
   };
-}
-
-function cleanProfileName(value) {
-  const name = String(value || DEFAULT_PROFILE_NAME).trim() || DEFAULT_PROFILE_NAME;
-  return name.replace(/[\/\\\r\n]/g, '-');
 }
 
 module.exports = {

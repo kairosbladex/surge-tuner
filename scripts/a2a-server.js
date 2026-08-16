@@ -285,14 +285,17 @@ function sendJson(res, statusCode, payload) {
 
 function main() {
   const port = Number(process.env.PORT || process.env.A2A_PORT || DEFAULT_PORT);
+  // 默认只绑定回环地址：服务无认证且可读写含订阅 token 的偏好文件，
+  // 绑定到 0.0.0.0 会把这些能力暴露给局域网。确需外绑时显式设置 A2A_HOST。
+  const host = process.env.A2A_HOST || '127.0.0.1';
   const server = createA2AServer({
     baseUrl: process.env.A2A_BASE_URL,
     allowLocalFiles: process.env.A2A_ALLOW_LOCAL_FILES === '1'
   });
 
-  server.listen(port, () => {
-    process.stdout.write(`Proxy Tuner A2A server listening on http://127.0.0.1:${port}\n`);
-    process.stdout.write(`Agent Card: http://127.0.0.1:${port}/.well-known/agent-card.json\n`);
+  server.listen(port, host, () => {
+    process.stdout.write(`Proxy Tuner A2A server listening on http://${host}:${port}\n`);
+    process.stdout.write(`Agent Card: http://${host}:${port}/.well-known/agent-card.json\n`);
     process.stdout.write(`Skills: generate-surge-profile, generate-loon-profile, generate-quantumultx-profile, generate-clash-profile, convert-config, install-adblock, manage-preferences, parse-proxies\n`);
     process.stdout.write(`Protocol: HTTP+JSON (message:send) + local HTTP+SSE streams (message:stream, tasks/:id:subscribe)\n`);
   });

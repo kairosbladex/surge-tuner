@@ -125,7 +125,33 @@ test('clash generator creates valid YAML with proxies', () => {
   assert.match(output, /rules:/);
   assert.match(output, /香港-HK-01/);
   assert.match(output, /美国-US-01/);
+  // 节点凭证必须保留（曾丢失 cipher/password/uuid 导致配置不可用）
+  assert.match(output, /password: secret/);
   assert.match(output, /MATCH,兜底分流/);
+});
+
+test('clash generator keeps credentials for every supported protocol', () => {
+  const proxies = [
+    { name: 'SS', type: 'ss', host: 'ss.example.com', port: 8388,
+      line: 'SS = ss, ss.example.com, 8388, encrypt-method=aes-256-gcm, password=sspass, udp-relay=true' },
+    { name: 'VM', type: 'vmess', host: 'vm.example.com', port: 443,
+      line: 'VM = vmess, vm.example.com, 443, username=uuid-1234, tls=true, sni=vm.example.com, ws=true, ws-path=/ray, ws-headers=Host:cdn.example.com, vmess-aead=true' },
+    { name: 'HY2', type: 'hysteria2', host: 'hy.example.com', port: 8443,
+      line: 'HY2 = hysteria2, hy.example.com, 8443, password=hypass, sni=hy.example.com, skip-cert-verify=true' },
+    { name: 'TUIC', type: 'tuic', host: 'tu.example.com', port: 10443,
+      line: 'TUIC = tuic, tu.example.com, 10443, token=tuicpass, uuid=tuic-uuid, sni=tu.example.com, alpn=h3' }
+  ];
+  const output = generateClashConfig({ proxies, services: [], adBlock: false });
+
+  assert.match(output, /cipher: aes-256-gcm/);
+  assert.match(output, /password: sspass/);
+  assert.match(output, /uuid: uuid-1234/);
+  assert.match(output, /network: ws/);
+  assert.match(output, /Host: cdn\.example\.com/);
+  assert.match(output, /password: hypass/);
+  assert.match(output, /skip-cert-verify: true/);
+  assert.match(output, /uuid: tuic-uuid/);
+  assert.match(output, /password: tuicpass/);
 });
 
 test('clash generator includes rule-providers with adblock', () => {
@@ -136,7 +162,8 @@ test('clash generator includes rule-providers with adblock', () => {
   });
 
   assert.match(output, /rule-providers:/);
-  assert.match(output, /RULE-SET.*REJECT/);
+  // 去广告清单内联展开为 REJECT 规则（本地 .list 上游无 Clash 版本）
+  assert.match(output, /DOMAIN-SUFFIX,.+,REJECT/);
 });
 
 test('clash generator creates proxy-providers for subscriptions', () => {
@@ -171,7 +198,7 @@ function runCli(script, args) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-tuner-cli-'));
   const output = path.join(dir, 'config.conf');
   execFileSync(process.execPath, [script, ...args, '--output', output], {
-    cwd: '/Users/wangxiaolin/GitHub/surge-tuner'
+    cwd: path.resolve(__dirname, '..')
   });
   return { dir, output, text: fs.readFileSync(output, 'utf8') };
 }
@@ -223,9 +250,9 @@ test('clash unified mode: --subscription produces YAML with proxy-providers and 
   // 订阅以 proxy-providers 形式引用
   assert.match(text, /proxy-providers:/);
   assert.match(text, /https:\/\/example\.com\/sub\?token=a/);
-  // adblock 内联（rule-providers + REJECT）
+  // adblock 内联（rule-providers + 内联 REJECT 规则）
   assert.match(text, /rule-providers:/);
-  assert.match(text, /RULE-SET.*REJECT/);
+  assert.match(text, /DOMAIN-SUFFIX,.+,REJECT/);
   // 不应生成 sidecar
   const sidecar = path.join(dir, 'config.clash-adblock-rule-providers');
   assert.ok(!fs.existsSync(sidecar), '一体化模式不应生成 clash sidecar');

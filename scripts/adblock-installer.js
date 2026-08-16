@@ -22,6 +22,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { renderSurgeScriptLines, renderLoonScriptLines } = require('./adblock-shared');
+
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 // ── Surge Module Template ───────────────────────────────────────────────────────
@@ -181,11 +183,7 @@ function generateSurgeModule(options = {}) {
   }
 
   // Scripts
-  const scripts = [
-    'http-response ^https?://.* requires-body = true script-path = scripts/ad-block-all.js',
-    'http-request ^https?://.* script-path = scripts/anti-tracking.js',
-    'http-response ^https?://.* script-path = scripts/anti-tracking.js'
-  ];
+  const scripts = renderSurgeScriptLines();
 
   for (const extra of extraScripts) {
     scripts.push(extra);
@@ -264,9 +262,9 @@ function generateLoonAdblockConfig(options = {}) {
 
   // Scripts
   lines.push('[Script]');
-  lines.push('http-response ^https?://.* script-path = scripts/ad-block-all.js, requires-body = true');
-  lines.push('http-request ^https?://.* script-path = scripts/anti-tracking.js');
-  lines.push('http-response ^https?://.* script-path = scripts/anti-tracking.js');
+  for (const scriptLine of renderLoonScriptLines()) {
+    lines.push(scriptLine);
+  }
   lines.push('');
 
   // kelee.one plugin references

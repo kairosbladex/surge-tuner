@@ -3,24 +3,27 @@
 
 const fs = require('fs');
 const path = require('path');
-const { loadProxySource } = require('./surge-proxy-parser');
 const { formatResults, hasFailure, validateText } = require('./surge-config-validator');
-const { splitList, applyServicePreset, buildProxySourceOptions } = require('./generator-common');
-const { prepareCatalogForServices } = require('./rule-discovery');
+const { parseGeneratorArgs, buildGeneratorInput, runGeneratorCli } = require('./generator-common');
 const { writeAdblockSidecar } = require('./adblock-artifacts');
-
-const REPO_ROOT = path.resolve(__dirname, '..');
-const DEFAULT_CATALOG_PATH = path.join(REPO_ROOT, 'rules/services/service-catalog.json');
-const BLACKMATRIX_SURGE_ROOT = 'https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge';
-
-const DEFAULT_REGIONS = [
-  { name: '香港节点', regex: '香港|Hong Kong|HK|HKG', type: 'url-test' },
-  { name: '日本节点', regex: '日本|Japan|Tokyo|JP|NRT', type: 'url-test' },
-  { name: '新加坡节点', regex: '新加坡|Singapore|SG|SGP', type: 'url-test' },
-  { name: '美国节点', regex: '美国|United States|USA|US|LAX|SFO', type: 'url-test' },
-  { name: '韩国节点', regex: '韩国|Korea|KR|Seoul', type: 'url-test' },
-  { name: '台湾节点', regex: '台湾|Taiwan|TW|Taipei|TPE', type: 'url-test' }
-];
+const { MITM_HOSTNAMES, renderSurgeScriptLines } = require('./adblock-shared');
+// 共享逻辑（默认区域/服务目录加载/输入归一化/服务解析等）统一来自 platform-base；
+// REPO_ROOT、DEFAULT_CATALOG_PATH、DEFAULT_REGIONS 与原私有拷贝内容一致。
+const {
+  REPO_ROOT,
+  DEFAULT_CATALOG_PATH,
+  DEFAULT_REGIONS,
+  loadCatalog,
+  normalizeSubscriptions,
+  normalizeProxies,
+  normalizeRegions,
+  normalizeAdBlock: baseNormalizeAdBlock,
+  resolveServices,
+  cleanName,
+  cleanValue,
+  ensureGroup,
+  remoteRuleUrl: baseRemoteRuleUrl
+} = require('./platform-base');
 
 const LOCAL_BASE_RULES = [
   ['rulesets/LAN.list', 'DIRECT'],
@@ -34,247 +37,47 @@ const LOCAL_ADBLOCK_RULES = [
   ['rulesets/AntiAd-Script.list', 'REJECT-TINYGIF']
 ];
 
+// ── CLI ─────────────────────────────────────────────────────────────────────────
+
+// surge 的 flag 集与其余三个平台一致，唯一差异是 catalog 默认值（经 extraFlags 表达）。
 function parseArgs(argv) {
-  const args = {
-    input: null,
-    address: null,
-    addresses: null,
-    addressFile: null,
-    subscription: [],
-    preset: null,
-    discoverRules: false,
-    unified: false,
-    adblockOutput: null,
-    output: null,
-    catalog: DEFAULT_CATALOG_PATH,
-    services: [],
-    adBlock: false,
-    validate: true,
-    strict: false,
-    help: false
-  };
-
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === '--help' || arg === '-h') {
-      args.help = true;
-    } else if (arg === '--input' || arg === '-i') {
-      args.input = argv[++i];
-    } else if (arg === '--address' || arg === '-a') {
-      args.address = argv[++i];
-    } else if (arg === '--addresses') {
-      args.addresses = argv[++i];
-    } else if (arg === '--address-file') {
-      args.addressFile = argv[++i];
-    } else if (arg === '--subscription') {
-      args.subscription.push(argv[++i]);
-    } else if (arg === '--preset') {
-      args.preset = argv[++i];
-    } else if (arg === '--discover-rules') {
-      args.discoverRules = true;
-    } else if (arg === '--unified') {
-      args.unified = true;
-    } else if (arg === '--output' || arg === '-o') {
-      args.output = argv[++i];
-    } else if (arg === '--adblock-output') {
-      args.adblockOutput = argv[++i];
-    } else if (arg === '--catalog') {
-      args.catalog = argv[++i];
-    } else if (arg === '--services') {
-      args.services = splitList(argv[++i]);
-    } else if (arg === '--adblock') {
-      args.adBlock = true;
-    } else if (arg === '--no-adblock') {
-      args.adBlock = false;
-    } else if (arg === '--skip-validate') {
-      args.validate = false;
-    } else if (arg === '--strict') {
-      args.strict = true;
-    } else {
-      throw new Error(`Unknown argument: ${arg}`);
-    }
-  }
-
-  return args;
+  return parseGeneratorArgs(argv, { catalog: DEFAULT_CATALOG_PATH });
 }
 
-function usage() {
-  return [
-    'Usage:',
-    '  node scripts/surge-config-generator.js --input <config.json> [--output <profile.conf>]',
-    '  node scripts/surge-config-generator.js --address <proxy-uri-or-subscription-url> [--services Telegram,YouTube] [--adblock] [--output <profile.conf>]',
-    '  node scripts/surge-config-generator.js --addresses <file-or-json-array> [--preset common] [--discover-rules] [--adblock] [--output <profile.conf>]',
-    '  node scripts/surge-config-generator.js --address-file <subscription.txt> [--services Telegram,YouTube] [--adblock] [--output <profile.conf>]',
-    '  Add --strict to fail on validation warnings, or --skip-validate for debug-only generation.',
-    '',
-    'Input shape:',
-    '  {',
-    '    "subscriptions": [{"name": "机场A", "url": "https://example.com/sub?token=xxx"}],',
-    '    "services": ["Telegram", "YouTube", "ChatGPT"],',
-    '    "adBlock": true',
-    '  }'
-  ].join('\n');
+// usage 文案逐字保留（CLI 行为零容忍）；五段式主流程已下沉 generator-common。
+const USAGE = [
+  'Usage:',
+  '  node scripts/surge-config-generator.js --input <config.json> [--output <profile.conf>]',
+  '  node scripts/surge-config-generator.js --address <proxy-uri-or-subscription-url> [--services Telegram,YouTube] [--adblock] [--output <profile.conf>]',
+  '  node scripts/surge-config-generator.js --addresses <file-or-json-array> [--preset common] [--discover-rules] [--adblock] [--output <profile.conf>]',
+  '  node scripts/surge-config-generator.js --address-file <subscription.txt> [--services Telegram,YouTube] [--adblock] [--output <profile.conf>]',
+  '  Add --strict to fail on validation warnings, or --skip-validate for debug-only generation.',
+  '',
+  'Input shape:',
+  '  {',
+  '    "subscriptions": [{"name": "机场A", "url": "https://example.com/sub?token=xxx"}],',
+  '    "services": ["Telegram", "YouTube", "ChatGPT"],',
+  '    "adBlock": true',
+  '  }'
+].join('\n');
+
+async function buildInputFromArgs(args) {
+  return buildGeneratorInput(args);
 }
 
-function readJson(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-}
-
-function cleanName(value, field) {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${field} must be a non-empty string`);
-  }
-  if (/[\r\n=,]/.test(value)) {
-    throw new Error(`${field} contains unsupported characters: ${value}`);
-  }
-  return value.trim();
-}
-
-function cleanValue(value, field) {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${field} must be a non-empty string`);
-  }
-  if (/[\r\n,]/.test(value)) {
-    throw new Error(`${field} contains unsupported characters: ${value}`);
-  }
-  return value.trim();
-}
-
-function cleanProxyLine(value, field) {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${field} must be a non-empty string`);
-  }
-  if (/[\r\n]/.test(value)) {
-    throw new Error(`${field} contains unsupported newline characters`);
-  }
-  return value.trim();
-}
-
-function loadCatalog(catalogPath = DEFAULT_CATALOG_PATH) {
-  const raw = readJson(catalogPath);
-  const canonical = new Map();
-  const aliases = new Map();
-
-  for (const [name, item] of Object.entries(raw)) {
-    const entry = {
-      name,
-      group: cleanName(item.group, `${name}.group`),
-      rules: Array.isArray(item.rules) ? item.rules.map((rule) => cleanValue(rule, `${name}.rules`)) : [],
-      policies: Array.isArray(item.policies) ? item.policies.map((policy) => cleanName(policy, `${name}.policies`)) : [],
-      aliases: Array.isArray(item.aliases) ? item.aliases : []
-    };
-    canonical.set(name.toLowerCase(), entry);
-    aliases.set(name.toLowerCase(), entry);
-    for (const alias of entry.aliases) {
-      aliases.set(String(alias).toLowerCase(), entry);
-    }
-  }
-
-  return { canonical, aliases };
-}
-
-function normalizeSubscriptions(input) {
-  if (!Array.isArray(input.subscriptions)) {
-    return [];
-  }
-
-  return input.subscriptions.map((sub, index) => ({
-    name: cleanName(sub.name || `机场${index + 1}`, `subscriptions[${index}].name`),
-    url: cleanValue(sub.url, `subscriptions[${index}].url`),
-    updateInterval: Number.isInteger(sub.updateInterval) ? sub.updateInterval : 86400
-  }));
-}
-
-function normalizeProxies(input) {
-  if (!Array.isArray(input.proxies)) {
-    return [];
-  }
-
-  return dedupeProxyObjects(input.proxies.map((proxy, index) => {
-    const name = cleanName(proxy.name, `proxies[${index}].name`);
-    return {
-      name,
-      type: proxy.type || '',
-      host: proxy.host || '',
-      port: proxy.port || null,
-      line: cleanProxyLine(proxy.line, `proxies[${index}].line`)
-    };
-  }));
-}
-
-function normalizeRegions(input) {
-  const source = Array.isArray(input.regions) && input.regions.length > 0 ? input.regions : DEFAULT_REGIONS;
-  return source.map((region, index) => ({
-    name: cleanName(region.name, `regions[${index}].name`),
-    regex: cleanValue(region.regex, `regions[${index}].regex`),
-    type: cleanName(region.type || 'url-test', `regions[${index}].type`),
-    url: region.url || 'http://www.gstatic.com/generate_204',
-    interval: Number.isInteger(region.interval) ? region.interval : 600,
-    tolerance: Number.isInteger(region.tolerance) ? region.tolerance : 50
-  }));
-}
-
+// platform-base 的 normalizeAdBlock 布尔分支为 `mitm: input.adBlock !== false`；
+// Surge 的历史语义是 mitm 严格等于开关本身（adBlock 缺省 undefined → enabled/mitm 均 false）。
+// 这里包一层锁定 Surge 现状语义，不随 base 漂移。
 function normalizeAdBlock(input) {
   if (typeof input.adBlock === 'boolean') {
     return { enabled: input.adBlock, mitm: input.adBlock };
   }
-  if (input.adBlock && typeof input.adBlock === 'object') {
-    return {
-      enabled: Boolean(input.adBlock.enabled),
-      mitm: input.adBlock.mitm !== false
-    };
-  }
-  return { enabled: false, mitm: false };
+  return baseNormalizeAdBlock(input);
 }
 
-function resolveServices(serviceNames, catalog) {
-  const selected = Array.isArray(serviceNames) ? serviceNames : [];
-  const groups = new Map();
-  const rules = [];
-
-  for (const rawName of selected) {
-    const key = String(rawName).toLowerCase();
-    const entry = catalog.aliases.get(key);
-    if (!entry) {
-      throw new Error(`Unknown service: ${rawName}`);
-    }
-
-    if (!groups.has(entry.group)) {
-      groups.set(entry.group, []);
-    }
-    groups.set(entry.group, mergeUnique(groups.get(entry.group), entry.policies));
-
-    for (const rule of entry.rules) {
-      rules.push({ path: rule, policy: entry.group });
-    }
-  }
-
-  return { groups, rules };
-}
-
-function mergeUnique(left, right) {
-  const out = [...left];
-  for (const value of right) {
-    if (!out.includes(value)) {
-      out.push(value);
-    }
-  }
-  return out;
-}
-
-function ensureGroup(groupMap, group, policies) {
-  if (groupMap.has(group)) {
-    groupMap.set(group, mergeUnique(groupMap.get(group), policies));
-  } else {
-    groupMap.set(group, [...policies]);
-  }
-}
-
+// base 版 remoteRuleUrl 需要 platform 参数；Surge 固定使用 Surge 规则 root。
 function remoteRuleUrl(rulePath) {
-  if (/^https?:\/\//i.test(rulePath)) {
-    return rulePath;
-  }
-  return `${BLACKMATRIX_SURGE_ROOT}/${rulePath}`;
+  return baseRemoteRuleUrl(rulePath, 'surge');
 }
 
 function section(name, lines) {
@@ -372,13 +175,9 @@ function generateSurgeConfig(input, options = {}) {
     output.push(section('MITM', [
       'enable = true',
       'skip-server-cert-verify = true',
-      'hostname = -*.apple.com, -*.icloud.com, -*.mzstatic.com, -*.crashlytics.com, *.pangle.io, *.pangleglobal.com, *.gdt.qq.com, *.ad.qq.com, *.doubleclick.net, *.googlesyndication.com, *.googleadservices.com, *.appsflyer.com, *.adjust.com'
+      `hostname = ${MITM_HOSTNAMES.join(', ')}`
     ]));
-    output.push(section('Script', [
-      'http-response ^https?://.* requires-body = true script-path = scripts/ad-block-all.js',
-      'http-request ^https?://.* script-path = scripts/anti-tracking.js',
-      'http-response ^https?://.* script-path = scripts/anti-tracking.js'
-    ]));
+    output.push(section('Script', renderSurgeScriptLines()));
   }
 
   return `${output.join('\n').replace(/\n{3,}/g, '\n\n').trim()}\n`;
@@ -655,7 +454,7 @@ function generateUnifiedSurgeConfig(input, options = {}) {
       '# （以下不输出 ca-p12/ca-passphrase，由 Surge 自动生成）',
       'enable = true',
       'skip-server-cert-verify = true',
-      'hostname = -*.apple.com, -*.icloud.com, -*.mzstatic.com, -*.crashlytics.com, *.pangle.io, *.pangleglobal.com, *.gdt.qq.com, *.ad.qq.com, *.doubleclick.net, *.googlesyndication.com, *.googleadservices.com, *.appsflyer.com, *.adjust.com'
+      `hostname = ${MITM_HOSTNAMES.join(', ')}`
     ];
     output.push(section('MITM', mitmLines));
 
@@ -663,9 +462,7 @@ function generateUnifiedSurgeConfig(input, options = {}) {
     const scriptLines = [
       '# 去广告脚本（需要本地或远程 script-path）',
       '# 推荐使用脚本仓库：https://github.com/blackmatrix7/ios_rule_script',
-      'http-response ^https?://.* requires-body = true, script-path = scripts/ad-block-all.js',
-      'http-request ^https?://.* script-path = scripts/anti-tracking.js',
-      'http-response ^https?://.* script-path = scripts/anti-tracking.js'
+      ...renderSurgeScriptLines()
     ];
     output.push(section('Script', scriptLines));
   }
@@ -726,53 +523,6 @@ function formatRegionGroup(region, proxies, subscriptions, subscriptionNames) {
   return `${region.name} = select, All`;
 }
 
-function dedupeProxyObjects(proxies) {
-  const seen = new Map();
-  return proxies.map((proxy) => {
-    const count = seen.get(proxy.name) || 0;
-    seen.set(proxy.name, count + 1);
-    if (count === 0) return proxy;
-
-    const nextName = `${proxy.name} ${count + 1}`;
-    return {
-      ...proxy,
-      name: nextName,
-      line: proxy.line.replace(`${proxy.name} = `, `${nextName} = `)
-    };
-  });
-}
-
-async function buildInputFromArgs(args) {
-  if (args.input) {
-    return applyServicePreset(readJson(path.resolve(process.cwd(), args.input)));
-  }
-
-  // --subscription name|url：解析订阅列表，不本地解析节点
-  if (args.unified && args.subscription && args.subscription.length > 0) {
-    const subscriptions = args.subscription.map((raw, index) => {
-      const sep = raw.indexOf('|');
-      const name = sep > 0 ? raw.slice(0, sep) : `机场${index + 1}`;
-      const url = sep > 0 ? raw.slice(sep + 1) : raw;
-      return { name, url, updateInterval: 86400 };
-    });
-    return applyServicePreset({
-      unified: true,
-      subscriptions,
-      services: args.services,
-      adBlock: args.adBlock,
-      preset: args.preset
-    });
-  }
-
-  const proxies = await loadProxySource(buildProxySourceOptions(args));
-  return applyServicePreset({
-    proxies,
-    services: args.services,
-    adBlock: args.adBlock,
-    preset: args.preset
-  });
-}
-
 function validateGeneratedConfig(config, filePath, options = {}) {
   const repoRoot = options.repoRoot || REPO_ROOT;
   const result = {
@@ -791,55 +541,45 @@ function validateGeneratedConfig(config, filePath, options = {}) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const hasInput = args.input || args.address || args.addresses || args.addressFile
-    || (args.subscription && args.subscription.length > 0);
-  if (args.help || !hasInput) {
-    console.log(usage());
-    process.exit(args.help ? 0 : 1);
-  }
-
-  const catalogPath = path.resolve(process.cwd(), args.catalog);
-  const input = await buildInputFromArgs(args);
-  const catalogResult = await prepareCatalogForServices(input.services, {
-    catalogPath,
-    discoverRules: args.discoverRules,
-    platform: 'surge'
-  });
-  const config = generateSurgeConfig(input, {
-    catalog: catalogResult.catalog
-  });
-  const outputPath = args.output ? path.resolve(process.cwd(), args.output) : path.join(REPO_ROOT, 'configs/generated/stdout.conf');
-
-  if (args.validate) {
-    const result = validateGeneratedConfig(config, outputPath, {
-      strict: args.strict
-    });
-    const warnings = result.issues.filter((issue) => issue.severity === 'warning');
-    if (warnings.length > 0) {
-      process.stderr.write(`Generated config validation warnings:\n${formatResults([{ ...result, issues: warnings }])}\n`);
-    }
-  }
-
-  if (args.output) {
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, config);
-    // 一体化模式不生成 sidecar（去广告已合并进主配置）
-    if (input.adBlock && !input.unified) {
-      const sidecar = writeAdblockSidecar(outputPath, 'surge', {
-        outputPath: args.adblockOutput
+  return runGeneratorCli({
+    platform: 'surge',
+    extraFlags: { catalog: DEFAULT_CATALOG_PATH },
+    generate: generateSurgeConfig,
+    usage: USAGE,
+    defaultOutput: 'configs/generated/stdout.conf',
+    // surge 专属校验门禁：自家 validator，strict 时 warning 也算失败；非 strict 打印 warning 到 stderr
+    validate: (config, outputPath, args) => {
+      const result = validateGeneratedConfig(config, outputPath, {
+        strict: args.strict
       });
-      process.stderr.write(`Ad-block module written to ${sidecar.path}\n`);
+      const warnings = result.issues.filter((issue) => issue.severity === 'warning');
+      if (warnings.length > 0) {
+        process.stderr.write(`Generated config validation warnings:\n${formatResults([{ ...result, issues: warnings }])}\n`);
+      }
+    },
+    // surge 专属输出：无 --output 时写 stdout；sidecar 提示走 stderr
+    emitResult: (config, outputPath, args, input) => {
+      if (args.output) {
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+        fs.writeFileSync(outputPath, config);
+        // 一体化模式不生成 sidecar（去广告已合并进主配置）
+        if (input.adBlock && !input.unified) {
+          const sidecar = writeAdblockSidecar(outputPath, 'surge', {
+            outputPath: args.adblockOutput
+          });
+          process.stderr.write(`Ad-block module written to ${sidecar.path}\n`);
+        }
+      } else {
+        process.stdout.write(config);
+        if (input.adBlock && !input.unified && args.adblockOutput) {
+          const sidecar = writeAdblockSidecar(args.adblockOutput, 'surge', {
+            outputPath: args.adblockOutput
+          });
+          process.stderr.write(`Ad-block module written to ${sidecar.path}\n`);
+        }
+      }
     }
-  } else {
-    process.stdout.write(config);
-    if (input.adBlock && !input.unified && args.adblockOutput) {
-      const sidecar = writeAdblockSidecar(args.adblockOutput, 'surge', {
-        outputPath: args.adblockOutput
-      });
-      process.stderr.write(`Ad-block module written to ${sidecar.path}\n`);
-    }
-  }
+  });
 }
 
 if (require.main === module) {

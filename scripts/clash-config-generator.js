@@ -22,22 +22,120 @@ const {
   classifyProxiesByRegion,
   ensureGroup,
   cleanName,
-  platformValidate,
   remoteRuleUrl
 } = require('./platform-base');
 
-const { loadProxySource } = require('./surge-proxy-parser');
-const { splitList, applyServicePreset, buildProxySourceOptions } = require('./generator-common');
-const { prepareCatalogForServices } = require('./rule-discovery');
-const { writeAdblockSidecar } = require('./adblock-artifacts');
+const { parseGeneratorArgs, buildGeneratorInput, runGeneratorCli } = require('./generator-common');
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 // ── Clash Constants ─────────────────────────────────────────────────────────────
 
-const CLASH_BLACKMATRIX_ROOT = 'https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash';
-
 function clashRuleProviderName(pathStr) {
   return pathStr.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'rule';
+}
+
+// 基础/去广告清单直接内联为 Clash 规则。这些本地 .list 是 Surge 格式，
+// 上游没有对应的 Clash 版本，rule-provider 远程引用只会得到 404。
+// ChinaIP.list 不内联：rules 末尾已有 GEOIP,CN,DIRECT 覆盖。
+const INLINE_BASE_RULESETS = [
+  ['LAN.list', 'DIRECT'],
+  ['Apple.list', 'DIRECT']
+];
+const INLINE_ADBLOCK_RULESETS = [
+  ['SplashAd.list', 'REJECT'],
+  ['InAppAd.list', 'REJECT'],
+  ['Tracking.list', 'REJECT']
+];
+
+function toClashInlineRule(rawLine, policy) {
+  const line = rawLine.trim();
+  if (!line || line.startsWith('#') || line.startsWith(';')) return null;
+  const parts = line.split(',').map((part) => part.trim());
+  const head = parts[0].toUpperCase();
+  if (['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'IP-CIDR', 'IP-CIDR6'].includes(head) && parts[1]) {
+    return `${head},${parts[1]},${policy}`;
+  }
+  if (parts.length === 1) {
+    const domain = parts[0].replace(/^\*\./, '');
+    if (domain && !domain.includes('/')) return `DOMAIN-SUFFIX,${domain},${policy}`;
+  }
+  return null;
+}
+
+function loadInlineRuleset(fileName, policy) {
+  const fullPath = path.join(REPO_ROOT, 'rulesets', fileName);
+  return fs.readFileSync(fullPath, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => toClashInlineRule(line, policy))
+    .filter(Boolean);
+}
+
+// 解析 Surge 格式节点行（`name = type, host, port, key=value, ...`）的参数表。
+// parser 只产出 Surge 文本行，Clash 需要的凭证字段（cipher/password/uuid 等）从这里还原。
+function parseProxyLineParams(line) {
+  const params = {};
+  if (typeof line !== 'string') return params;
+  const eqIndex = line.indexOf('=');
+  if (eqIndex < 0) return params;
+  const parts = line.slice(eqIndex + 1).split(',').map((part) => part.trim());
+  for (const part of parts.slice(3)) { // 前 3 段固定是 type/host/port
+    const kvIndex = part.indexOf('=');
+    if (kvIndex < 1) continue;
+    params[part.slice(0, kvIndex).trim()] = part.slice(kvIndex + 1).trim();
+  }
+  return params;
+}
+
+function toClashProxy(proxy) {
+  const params = parseProxyLineParams(proxy.line);
+  const out = {
+    name: proxy.name,
+    type: proxy.type || 'ss',
+    server: proxy.host,
+    port: proxy.port
+  };
+  switch (proxy.type) {
+    case 'ss':
+      if (params['encrypt-method']) out.cipher = params['encrypt-method'];
+      if (params.password) out.password = params.password;
+      out.udp = true;
+      break;
+    case 'trojan':
+      if (params.password) out.password = params.password;
+      if (params.sni) out.sni = params.sni;
+      if (params['skip-cert-verify'] === 'true') out['skip-cert-verify'] = true;
+      out.udp = true;
+      break;
+    case 'vmess':
+      if (params.username) out.uuid = params.username;
+      out.alterId = 0;
+      out.cipher = params['encrypt-method'] || 'auto';
+      if (params.tls === 'true') out.tls = true;
+      if (params.sni) out.servername = params.sni;
+      if (params.ws === 'true') {
+        const wsOpts = { path: params['ws-path'] || '/' };
+        const hostHeader = String(params['ws-headers'] || '').replace(/^Host:/i, '').trim();
+        if (hostHeader) wsOpts.headers = { Host: hostHeader };
+        out.network = 'ws';
+        out['ws-opts'] = wsOpts;
+      }
+      break;
+    case 'hysteria2':
+      if (params.password) out.password = params.password;
+      if (params.sni) out.sni = params.sni;
+      if (params['skip-cert-verify'] === 'true') out['skip-cert-verify'] = true;
+      break;
+    case 'tuic':
+      // parser 输出 token=<password|uuid>，uuid 与密码并存时另有 uuid=<uuid>
+      if (params.uuid || params.token) out.uuid = params.uuid || params.token;
+      if (params.token) out.password = params.token;
+      if (params.sni) out.sni = params.sni;
+      if (params.alpn) out.alpn = [params.alpn];
+      break;
+    default:
+      break;
+  }
+  return out;
 }
 
 function yamlStr(value) {
@@ -81,7 +179,7 @@ function generateClashConfig(input, options = {}) {
   const serviceSelection = resolveServices(input.services, catalog);
   const finalPolicy = cleanName(input.finalPolicy || '兜底分流', 'finalPolicy');
 
-  const { classified, unclassified } = classifyProxiesByRegion(proxies, regions);
+  const { classified } = classifyProxiesByRegion(proxies, regions);
 
   // ── Build YAML ────────────────────────────────────────────────────────────
 
@@ -107,12 +205,7 @@ function generateClashConfig(input, options = {}) {
   };
 
   // --- proxies ---
-  const proxyList = proxies.map((p) => {
-    const name = p.name;
-    const type = p.type || 'ss';
-    const clashType = type === 'ss' ? 'ss' : type;
-    return { name, type: clashType, server: p.host, port: p.port };
-  });
+  const proxyList = proxies.map((p) => toClashProxy(p));
 
   sections['proxies'] = proxyList;
 
@@ -193,34 +286,8 @@ function generateClashConfig(input, options = {}) {
     }
   }
 
-  // --- rule-providers ---
+  // --- rule-providers（仅目录服务规则；基础/去广告清单内联到 rules 段） ---
   const ruleProviders = {};
-  const serviceRules = [];
-
-  // Base rules
-  const baseRules = [
-    'RULE-SET,LAN.list,DIRECT',
-    'RULE-SET,Apple.list,DIRECT'
-  ];
-
-  if (adBlock.enabled) {
-    baseRules.push(
-      'RULE-SET,SplashAd.list,REJECT',
-      'RULE-SET,InAppAd.list,REJECT',
-      'RULE-SET,Tracking.list,REJECT'
-    );
-  }
-
-  baseRules.push('RULE-SET,ChinaIP.list,DIRECT');
-
-  // Convert RULE-SET references to rule-providers
-  const ruleSetRefs = new Set();
-  for (const rule of baseRules) {
-    const match = rule.match(/^RULE-SET,(.+?),(.+)$/);
-    if (match) {
-      ruleSetRefs.add(match[1]);
-    }
-  }
 
   for (const rule of serviceSelection.rules) {
     const name = clashRuleProviderName(rule.path);
@@ -233,34 +300,22 @@ function generateClashConfig(input, options = {}) {
     };
   }
 
-  // Local rule-set providers
-  for (const rs of ruleSetRefs) {
-    const name = clashRuleProviderName(rs);
-    if (!ruleProviders[name]) {
-      ruleProviders[name] = {
-        type: 'http',
-        behavior: 'classical',
-        url: `${CLASH_BLACKMATRIX_ROOT}/../Clash/${name.replace(/\.list$/, '')}/${name.replace(/\.list$/, '')}.yaml`,
-        interval: 86400,
-        path: `./rules/${name}.yaml`
-      };
-    }
-  }
-
   if (Object.keys(ruleProviders).length > 0) {
     sections['rule-providers'] = ruleProviders;
   }
 
   // --- rules ---
-  const rules = [];
+  // 基础与去广告清单内联展开，RULE-SET 名称必须与上面 provider 名一一对应。
+  const rules = INLINE_BASE_RULESETS.flatMap(([file, policy]) => loadInlineRuleset(file, policy));
 
-  for (const rule of baseRules) {
-    rules.push(rule);
+  if (adBlock.enabled) {
+    for (const [file, policy] of INLINE_ADBLOCK_RULESETS) {
+      rules.push(...loadInlineRuleset(file, policy));
+    }
   }
 
   for (const rule of serviceSelection.rules) {
-    const name = clashRuleProviderName(rule.path);
-    rules.push(`RULE-SET,${name},${rule.policy}`);
+    rules.push(`RULE-SET,${clashRuleProviderName(rule.path)},${rule.policy}`);
   }
 
   const customRules = Array.isArray(input.rules) ? input.rules : [];
@@ -278,6 +333,25 @@ function generateClashConfig(input, options = {}) {
 
   const yamlLines = ['# Generated by scripts/clash-config-generator.js', ''];
 
+  // 递归序列化字段值，ws-opts.headers 这类多层嵌套也能正确输出。
+  function serializeField(fieldKey, fieldValue, fieldIndent) {
+    if (fieldValue === undefined) return;
+    const fieldPrefix = ' '.repeat(fieldIndent);
+    if (Array.isArray(fieldValue)) {
+      yamlLines.push(`${fieldPrefix}${fieldKey}:`);
+      for (const elem of fieldValue) {
+        yamlLines.push(`${fieldPrefix}  - ${yamlStr(elem)}`);
+      }
+    } else if (typeof fieldValue === 'object' && fieldValue !== null) {
+      yamlLines.push(`${fieldPrefix}${fieldKey}:`);
+      for (const [nestedKey, nestedValue] of Object.entries(fieldValue)) {
+        serializeField(nestedKey, nestedValue, fieldIndent + 2);
+      }
+    } else {
+      yamlLines.push(`${fieldPrefix}${fieldKey}: ${yamlStr(fieldValue)}`);
+    }
+  }
+
   function serializeSection(key, value, indent = 0) {
     const prefix = ' '.repeat(indent);
     if (value === null || value === undefined) return;
@@ -290,19 +364,7 @@ function generateClashConfig(input, options = {}) {
           yamlLines.push(`${prefix}  - name: ${yamlStr(item.name)}`);
           for (const [ik, iv] of Object.entries(item)) {
             if (ik === 'name') continue;
-            if (Array.isArray(iv)) {
-              yamlLines.push(`${prefix}    ${ik}:`);
-              for (const elem of iv) {
-                yamlLines.push(`${prefix}      - ${yamlStr(elem)}`);
-              }
-            } else if (typeof iv === 'object' && iv !== null) {
-              yamlLines.push(`${prefix}    ${ik}:`);
-              for (const [ik2, iv2] of Object.entries(iv)) {
-                yamlLines.push(`${prefix}      ${ik2}: ${yamlStr(iv2)}`);
-              }
-            } else {
-              yamlLines.push(`${prefix}    ${ik}: ${yamlStr(iv)}`);
-            }
+            serializeField(ik, iv, indent + 4);
           }
         }
       } else {
@@ -373,105 +435,33 @@ function generateClashConfig(input, options = {}) {
 
 // ── CLI ─────────────────────────────────────────────────────────────────────────
 
-function parseArgs(argv) {
-  const args = {
-    input: null, address: null, addresses: null, addressFile: null, output: null,
-    catalog: null, services: [], preset: null, discoverRules: false, adblockOutput: null,
-    unified: false, subscription: [],
-    adBlock: false, validate: true, strict: false, help: false
-  };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === '--help' || arg === '-h') args.help = true;
-    else if (arg === '--input' || arg === '-i') args.input = argv[++i];
-    else if (arg === '--address' || arg === '-a') args.address = argv[++i];
-    else if (arg === '--addresses') args.addresses = argv[++i];
-    else if (arg === '--address-file') args.addressFile = argv[++i];
-    else if (arg === '--output' || arg === '-o') args.output = argv[++i];
-    else if (arg === '--adblock-output') args.adblockOutput = argv[++i];
-    else if (arg === '--catalog') args.catalog = argv[++i];
-    else if (arg === '--services') args.services = splitList(argv[++i]);
-    else if (arg === '--preset') args.preset = argv[++i];
-    else if (arg === '--discover-rules') args.discoverRules = true;
-    else if (arg === '--unified') args.unified = true;
-    else if (arg === '--subscription') args.subscription.push(argv[++i]);
-    else if (arg === '--adblock') args.adBlock = true;
-    else if (arg === '--no-adblock') args.adBlock = false;
-    else if (arg === '--skip-validate') args.validate = false;
-    else if (arg === '--strict') args.strict = true;
-    else throw new Error(`Unknown argument: ${arg}`);
-  }
-  return args;
-}
+// usage 文案逐字保留（CLI 行为零容忍）；五段式主流程已下沉 generator-common。
+const USAGE = [
+  'Usage:',
+  '  node scripts/clash-config-generator.js --input <config.json> [--output <clash.yaml>]',
+  '  node scripts/clash-config-generator.js --address <proxy-uri-or-subscription-url> [--services Telegram,YouTube] [--adblock] [--output <clash.yaml>]',
+  '  node scripts/clash-config-generator.js --addresses <file-or-json-array> [--preset common] [--discover-rules] [--adblock] [--output <clash.yaml>]',
+  '  node scripts/clash-config-generator.js --unified --subscription <name|url> [--subscription ...] [--preset common] [--adblock] [--output <clash.yaml>]'
+].join('\n');
 
-function usage() {
-  return [
-    'Usage:',
-    '  node scripts/clash-config-generator.js --input <config.json> [--output <clash.yaml>]',
-    '  node scripts/clash-config-generator.js --address <proxy-uri-or-subscription-url> [--services Telegram,YouTube] [--adblock] [--output <clash.yaml>]',
-    '  node scripts/clash-config-generator.js --addresses <file-or-json-array> [--preset common] [--discover-rules] [--adblock] [--output <clash.yaml>]',
-    '  node scripts/clash-config-generator.js --unified --subscription <name|url> [--subscription ...] [--preset common] [--adblock] [--output <clash.yaml>]'
-  ].join('\n');
+function parseArgs(argv) {
+  return parseGeneratorArgs(argv);
 }
 
 async function buildInputFromArgs(args) {
-  if (args.input) return applyServicePreset(JSON.parse(fs.readFileSync(path.resolve(process.cwd(), args.input), 'utf8')));
-  if (args.unified && args.subscription.length > 0) {
-    const subscriptions = args.subscription.map((raw, index) => {
-      const sep = raw.indexOf('|');
-      const name = sep > 0 ? raw.slice(0, sep) : `机场${index + 1}`;
-      const url = sep > 0 ? raw.slice(sep + 1) : raw;
-      return { name, url, updateInterval: 86400 };
-    });
-    return applyServicePreset({ unified: true, subscriptions, services: args.services, adBlock: args.adBlock, preset: args.preset });
-  }
-  const proxies = await loadProxySource(buildProxySourceOptions(args));
-  return applyServicePreset({ proxies, services: args.services, adBlock: args.adBlock, preset: args.preset });
+  return buildGeneratorInput(args);
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const hasInput = args.input || args.address || args.addresses || args.addressFile
-    || (args.subscription.length > 0);
-  if (args.help || !hasInput) {
-    console.log(usage());
-    process.exit(args.help ? 0 : 1);
-  }
-
-  const input = await buildInputFromArgs(args);
-  const catalogPath = args.catalog ? path.resolve(process.cwd(), args.catalog) : undefined;
-  const catalogResult = await prepareCatalogForServices(input.services, {
-    catalogPath,
-    discoverRules: args.discoverRules,
-    platform: 'clash'
+  return runGeneratorCli({
+    platform: 'clash',
+    label: 'Clash',
+    generate: generateClashConfig,
+    usage: USAGE,
+    defaultOutput: 'configs/generated/clash.yaml'
   });
-  const config = generateClashConfig(input, {
-    catalog: catalogResult.catalog
-  });
-
-  const outputPath = args.output
-    ? path.resolve(process.cwd(), args.output)
-    : path.join(REPO_ROOT, 'configs/generated/clash.yaml');
-
-  if (args.validate) {
-    const issues = platformValidate(config, 'clash');
-    const errors = issues.filter((i) => i.severity === 'error');
-    if ((args.strict && issues.length > 0) || errors.length > 0) {
-      throw new Error(`Config validation failed:\n${issues.map((i) => `  ${i.severity}: ${i.message}`).join('\n')}`);
-    }
-  }
-
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, config);
-  if (input.adBlock && !input.unified) {
-    const sidecar = writeAdblockSidecar(outputPath, 'clash', {
-      outputPath: args.adblockOutput
-    });
-    console.log(`Clash ad-block artifact written to ${sidecar.path}`);
-  }
-  console.log(`Clash config written to ${outputPath}`);
 }
 
 if (require.main === module) main().catch((err) => { console.error(err.message); process.exit(1); });
 
-module.exports = { generateClashConfig, buildInputFromArgs, parseArgs };
+module.exports = { generateClashConfig, buildInputFromArgs, parseArgs, toClashProxy, toClashInlineRule };

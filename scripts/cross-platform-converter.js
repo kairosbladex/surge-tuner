@@ -460,7 +460,15 @@ function main() {
   }
 }
 
-if (require.main === module) main().catch((err) => { console.error(err.message); process.exit(1); });
+if (require.main === module) {
+  // main() 是同步函数，不能用 .catch()；同步捕获错误并统一退出码。
+  try {
+    main();
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+}
 
 module.exports = {
   PLATFORMS,

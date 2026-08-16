@@ -9,9 +9,6 @@
  *   node scripts/quantumultx-config-generator.js --input <input.json> [--output <qx.conf>]
  */
 
-const fs = require('fs');
-const path = require('path');
-
 const {
   loadCatalog,
   normalizeSubscriptions,
@@ -22,19 +19,10 @@ const {
   classifyProxiesByRegion,
   ensureGroup,
   cleanName,
-  platformValidate,
   remoteRuleUrl
 } = require('./platform-base');
 
-const { loadProxySource } = require('./surge-proxy-parser');
-const { splitList, applyServicePreset, buildProxySourceOptions } = require('./generator-common');
-const { prepareCatalogForServices } = require('./rule-discovery');
-const { writeAdblockSidecar } = require('./adblock-artifacts');
-const REPO_ROOT = path.resolve(__dirname, '..');
-
-// ── QX Constants ────────────────────────────────────────────────────────────────
-
-const QX_BLACKMATRIX_ROOT = 'https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/QuantumultX';
+const { parseGeneratorArgs, buildGeneratorInput, runGeneratorCli } = require('./generator-common');
 
 // ── Main Generator ──────────────────────────────────────────────────────────────
 
@@ -50,7 +38,7 @@ function generateQuantumultXConfig(input, options = {}) {
   const serviceSelection = resolveServices(input.services, catalog);
   const finalPolicy = cleanName(input.finalPolicy || '兜底分流', 'finalPolicy');
 
-  const { classified, unclassified } = classifyProxiesByRegion(proxies, regions);
+  const { classified } = classifyProxiesByRegion(proxies, regions);
 
   // ── Sections ──────────────────────────────────────────────────────────────
 
@@ -132,7 +120,6 @@ function generateQuantumultXConfig(input, options = {}) {
   }
   // Service rule providers
   for (const rule of serviceSelection.rules) {
-    const qxPath = rule.path.replace(/\.list$/, '.list').replace(/^[^/]+\//, ''); // Strip Surge subdir
     const url = remoteRuleUrl(rule.path, 'quantumultx');
     filterRemoteLines.push(`${url}, tag=${rule.policy.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '')}, policy=${rule.policy}, enabled=true`);
   }
@@ -200,103 +187,31 @@ function generateQuantumultXConfig(input, options = {}) {
 
 // ── CLI ─────────────────────────────────────────────────────────────────────────
 
-function parseArgs(argv) {
-  const args = {
-    input: null, address: null, addresses: null, addressFile: null, output: null,
-    catalog: null, services: [], preset: null, discoverRules: false, adblockOutput: null,
-    unified: false, subscription: [],
-    adBlock: false, validate: true, strict: false, help: false
-  };
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === '--help' || arg === '-h') args.help = true;
-    else if (arg === '--input' || arg === '-i') args.input = argv[++i];
-    else if (arg === '--address' || arg === '-a') args.address = argv[++i];
-    else if (arg === '--addresses') args.addresses = argv[++i];
-    else if (arg === '--address-file') args.addressFile = argv[++i];
-    else if (arg === '--output' || arg === '-o') args.output = argv[++i];
-    else if (arg === '--adblock-output') args.adblockOutput = argv[++i];
-    else if (arg === '--catalog') args.catalog = argv[++i];
-    else if (arg === '--services') args.services = splitList(argv[++i]);
-    else if (arg === '--preset') args.preset = argv[++i];
-    else if (arg === '--discover-rules') args.discoverRules = true;
-    else if (arg === '--unified') args.unified = true;
-    else if (arg === '--subscription') args.subscription.push(argv[++i]);
-    else if (arg === '--adblock') args.adBlock = true;
-    else if (arg === '--no-adblock') args.adBlock = false;
-    else if (arg === '--skip-validate') args.validate = false;
-    else if (arg === '--strict') args.strict = true;
-    else throw new Error(`Unknown argument: ${arg}`);
-  }
-  return args;
-}
+// usage 文案逐字保留（CLI 行为零容忍）；五段式主流程已下沉 generator-common。
+const USAGE = [
+  'Usage:',
+  '  node scripts/quantumultx-config-generator.js --input <config.json> [--output <qx.conf>]',
+  '  node scripts/quantumultx-config-generator.js --address <proxy-uri-or-subscription-url> [--services Telegram,YouTube] [--adblock] [--output <qx.conf>]',
+  '  node scripts/quantumultx-config-generator.js --addresses <file-or-json-array> [--preset common] [--discover-rules] [--adblock] [--output <qx.conf>]',
+  '  node scripts/quantumultx-config-generator.js --unified --subscription <name|url> [--subscription ...] [--preset common] [--adblock] [--output <qx.conf>]'
+].join('\n');
 
-function usage() {
-  return [
-    'Usage:',
-    '  node scripts/quantumultx-config-generator.js --input <config.json> [--output <qx.conf>]',
-    '  node scripts/quantumultx-config-generator.js --address <proxy-uri-or-subscription-url> [--services Telegram,YouTube] [--adblock] [--output <qx.conf>]',
-    '  node scripts/quantumultx-config-generator.js --addresses <file-or-json-array> [--preset common] [--discover-rules] [--adblock] [--output <qx.conf>]',
-    '  node scripts/quantumultx-config-generator.js --unified --subscription <name|url> [--subscription ...] [--preset common] [--adblock] [--output <qx.conf>]'
-  ].join('\n');
+function parseArgs(argv) {
+  return parseGeneratorArgs(argv);
 }
 
 async function buildInputFromArgs(args) {
-  if (args.input) return applyServicePreset(JSON.parse(fs.readFileSync(path.resolve(process.cwd(), args.input), 'utf8')));
-  if (args.unified && args.subscription.length > 0) {
-    const subscriptions = args.subscription.map((raw, index) => {
-      const sep = raw.indexOf('|');
-      const name = sep > 0 ? raw.slice(0, sep) : `机场${index + 1}`;
-      const url = sep > 0 ? raw.slice(sep + 1) : raw;
-      return { name, url, updateInterval: 86400 };
-    });
-    return applyServicePreset({ unified: true, subscriptions, services: args.services, adBlock: args.adBlock, preset: args.preset });
-  }
-  const proxies = await loadProxySource(buildProxySourceOptions(args));
-  return applyServicePreset({ proxies, services: args.services, adBlock: args.adBlock, preset: args.preset });
+  return buildGeneratorInput(args);
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const hasInput = args.input || args.address || args.addresses || args.addressFile
-    || (args.subscription.length > 0);
-  if (args.help || !hasInput) {
-    console.log(usage());
-    process.exit(args.help ? 0 : 1);
-  }
-
-  const input = await buildInputFromArgs(args);
-  const catalogPath = args.catalog ? path.resolve(process.cwd(), args.catalog) : undefined;
-  const catalogResult = await prepareCatalogForServices(input.services, {
-    catalogPath,
-    discoverRules: args.discoverRules,
-    platform: 'quantumultx'
+  return runGeneratorCli({
+    platform: 'quantumultx',
+    label: 'Quantumult X',
+    generate: generateQuantumultXConfig,
+    usage: USAGE,
+    defaultOutput: 'configs/generated/qx.conf'
   });
-  const config = generateQuantumultXConfig(input, {
-    catalog: catalogResult.catalog
-  });
-
-  const outputPath = args.output
-    ? path.resolve(process.cwd(), args.output)
-    : path.join(REPO_ROOT, 'configs/generated/qx.conf');
-
-  if (args.validate) {
-    const issues = platformValidate(config, 'quantumultx');
-    const errors = issues.filter((i) => i.severity === 'error');
-    if ((args.strict && issues.length > 0) || errors.length > 0) {
-      throw new Error(`Config validation failed:\n${issues.map((i) => `  ${i.severity}: ${i.message}`).join('\n')}`);
-    }
-  }
-
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, config);
-  if (input.adBlock && !input.unified) {
-    const sidecar = writeAdblockSidecar(outputPath, 'quantumultx', {
-      outputPath: args.adblockOutput
-    });
-    console.log(`Quantumult X ad-block artifact written to ${sidecar.path}`);
-  }
-  console.log(`Quantumult X config written to ${outputPath}`);
 }
 
 if (require.main === module) main().catch((err) => { console.error(err.message); process.exit(1); });

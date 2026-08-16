@@ -1,13 +1,13 @@
 # Surge Tuner (Legacy) — Surge iOS 配置调优 & 去广告工具包
 
-> ⚠️ **此技能已升级为 [Proxy Tuner](../proxy-tuner.skill.md)**
+> ⚠️ **此技能已升级为 [Proxy Tuner](./proxy-tuner.skill.md)**
 > 本文件保留作为向后兼容入口。新用户请使用 Proxy Tuner。
 
 ## Description
 
 Surge iOS 配置调优与广告拦截助手。帮助用户生成稳定的 Surge 配置、去除国内 App 的开屏广告和应用内广告。
 
-> **新功能提示**: 现在你可以通过 [Proxy Tuner](../proxy-tuner.skill.md) 实现：
+> **新功能提示**: 现在你可以通过 [Proxy Tuner](./proxy-tuner.skill.md) 实现：
 > - 🔗 自动解析机场订阅链接，按地区分组节点
 > - 🧠 智能策略推荐（URL-Test / Smart / Select）
 > - 🌐 跨平台配置生成（Surge / Loon / QX / Clash）

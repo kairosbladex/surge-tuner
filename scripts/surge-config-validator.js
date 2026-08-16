@@ -11,7 +11,8 @@ const KNOWN_GROUP_TYPES = new Set([
   'url-test',
   'fallback',
   'load-balance',
-  'subnet'
+  'subnet',
+  'smart'
 ]);
 
 const RESERVED_POLICIES = new Set([
