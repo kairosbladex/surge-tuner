@@ -8,6 +8,9 @@ Proxy Tuner 是一个本地小工具。你把服务商后台给你的订阅链�
 
 你的真实链接只在你自己的电脑上处理。不要把订阅链接、节点链接、生成后的配置文件发到微信群、公开仓库、截图或论坛里。
 
+> 🔰 完全没接触过命令行？看 [零基础新手教程](docs/beginner-guide.md)（Windows / Mac 通用）。
+> 环境有问题先跑 `npm run doctor` 自检，它会逐项检查并告诉你怎么修。
+
 ## 零依赖快速开始
 
 你需要一台电脑和 Node >= 20。还没有 Node？从 [nodejs.org](https://nodejs.org) 下载安装 LTS 版本即可。还没有 Git？Mac 用户首次运行 `git clone` 时会自动提示安装；Windows 用户请从 [git-scm.com](https://git-scm.com) 下载。

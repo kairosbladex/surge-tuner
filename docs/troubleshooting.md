@@ -1,5 +1,20 @@
 # 故障排除指南
 
+## 电脑端环境问题
+
+项目跑不起来先做环境自检，它会逐项检查 Node/git/代理/网络/目录/端口并给出修复提示：
+
+```bash
+npm run doctor
+```
+
+- **`node`/`npm` 不是命令**：没装 Node 或装完没重开终端 → 到 [nodejs.org](https://nodejs.org) 装 LTS。
+- **git 报 `SSL/TLS connection failed`**：配置了失效代理 → `git config --global --unset http.proxy && git config --global --unset https.proxy`。
+- **浏览器打不开生成页面**：看终端打印的实际端口（被占用会自动换），或手动访问 `http://127.0.0.1:8788`。
+- 零基础完整流程见 [新手教程](beginner-guide.md)。
+
+下面是**手机端**（Surge 等 App）使用中的常见问题。
+
 ## 常见问题
 
 ### 1. Surge 开启后断网

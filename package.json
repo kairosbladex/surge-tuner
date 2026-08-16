@@ -14,8 +14,9 @@
     "prefs": "node scripts/user-preference-store.js",
     "quick-start": "node scripts/quick-start-server.js",
     "start:a2a": "node scripts/a2a-server.js",
+    "doctor": "node scripts/doctor.js",
     "validate": "node scripts/surge-config-validator.js --all",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test",
     "check": "npm test && npm run validate"
   },
   "engines": {
