@@ -1,0 +1,9 @@
+#!name=拼多多底栏标记诊断（临时）
+#!desc=仅将首页底栏文字改为“首页测试”，验证客户端是否采用响应；测试后停用。保留所有入口，不用于去广告。
+#!system=iOS
+
+[Body Rewrite]
+http-response-jq ^https://api\.pinduoduo\.com/api/alexa/homepage/hub(?:\?|$) 'if (.result | type) == "object" then reduce ["bottom_tabs", "buffer_bottom_tabs"][] as $key (. ; if (.result[$key] | type) == "array" then .result[$key] |= map(if type == "object" then if .link == "index.html" then .title = "首页测试" else . end else . end) else . end) else . end'
+
+[MITM]
+hostname = %APPEND% api.pinduoduo.com
